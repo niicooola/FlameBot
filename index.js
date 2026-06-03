@@ -1,3 +1,8 @@
+client.on('messageCreate', async (message) => {
+    console.log(`Debug: I see a message from ${message.author.username}: ${message.content}`); // ADD THIS
+    if (message.author.bot || !message.guild) return;
+    // ... rest of your code
+});
 require('dotenv').config();
 process.on('uncaughtException', (err) => {
   console.error('CRASHED! Error:', err);
