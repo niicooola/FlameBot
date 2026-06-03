@@ -20,6 +20,7 @@ const PORT = process.env.PORT || 3000;
 const VIP_ROLE_ID = process.env.VIP_ROLE_ID || '1511458646348009573';
 const MUTE_ROLE_ID = process.env.MUTE_ROLE_ID || '1509040670801789019';
 const STREAM_PING_ROLE_ID = process.env.STREAM_PING_ROLE_ID || '1503627239713935452';
+const LEVEL_CHANNEL_ID = '1511569329949380668';
 
 // SETTINGS
 const PREFIX = '!';
@@ -94,6 +95,24 @@ function cleanAmount(value) {
     return Number.isFinite(n) ? n : null;
 }
 
+// 🚨 FEATURE 1 Helper: DM Server Leadership Audit Log Notice
+async function dmServerLeadership(guild, embed) {
+    try {
+        const members = await guild.members.fetch();
+        const management = members.filter(m => 
+            m.id === guild.ownerId || 
+            m.roles.cache.some(r => ['Admin', 'Owner/Streamer'].includes(r.name))
+        );
+        management.forEach(async (admin) => {
+            if (!admin.user.bot) {
+                await admin.send({ embeds: [embed] }).catch(() => {});
+            }
+        });
+    } catch (err) {
+        console.error('Leadership DM pipeline failed:', err);
+    }
+}
+
 // DATABASE CONNECT
 if (MONGO_URI) {
     mongoose.connect(MONGO_URI)
@@ -155,16 +174,16 @@ client.on('messageCreate', async message => {
         const oldLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
 
         userData.coins += CHAT_INCOME;
-        userData.xp += 2; // Talking gives +2 XP
+        userData.xp += 2; 
 
         const newLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
 
-        // Level Up Alert
+        // Level Up Alert Channel Lock Routing
         if (newLevel > oldLevel) {
             const coinPrize = 100 + (newLevel * 50);
             userData.coins += coinPrize;
 
-            const levelChannel = message.guild.channels.cache.get('1511569329949380668');
+            const levelChannel = message.guild.channels.cache.get(LEVEL_CHANNEL_ID);
             if (levelChannel) {
                 levelChannel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevel}**!! Payout: 🪙 **+${coinPrize}** Flame Coins.`);
             } else {
@@ -174,7 +193,7 @@ client.on('messageCreate', async message => {
 
         await userData.save();
 
-        // Smart Talking Logic via Groq
+        // Smart Talking Logic via Groq Check Matrix
         if (message.content.trim().split(/\s+/).length >= 3) {
             try {
                 const filterCompletion = await groq.chat.completions.create({
@@ -222,17 +241,17 @@ client.on('messageCreate', async message => {
                 console.error('Groq Smart Chat Error:', err);
             }
         }
-        return; // Exits loop for regular chatter
+        return; 
     }
 
-    // --- COMMAND ENGINE MATRIX ---
+    // --- COMMAND PARSING MATRIX ENGINE ---
     const args = message.content.trim().split(/\s+/);
     const command = args[0].toLowerCase();
 
     const oldLevelCmd = Math.floor(0.1 * Math.sqrt(userData.xp));
 
     userData.coins += CHAT_INCOME;
-    userData.xp += 5; // Commands grant +5 XP
+    userData.xp += 5; 
 
     const newLevelCmd = Math.floor(0.1 * Math.sqrt(userData.xp));
 
@@ -240,7 +259,7 @@ client.on('messageCreate', async message => {
         const coinPrizeCmd = 100 + (newLevelCmd * 50);
         userData.coins += coinPrizeCmd;
 
-        const levelChannelCmd = message.guild.channels.cache.get('1511569329949380668');
+        const levelChannelCmd = message.guild.channels.cache.get(LEVEL_CHANNEL_ID);
         if (levelChannelCmd) {
             levelChannelCmd.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevelCmd}**!! Payout: 🪙 **+${coinPrizeCmd}** Flame Coins.`);
         } else {
@@ -278,12 +297,30 @@ client.on('messageCreate', async message => {
             .setColor('#2F3136')
             .setTitle('🛡️ Staff Command Hub')
             .addFields(
-                { name: '⚠️ Moderation', value: '`!warn @user`, `!warnings @user`, `!clearwarns @user`, `!mute @user`, `!unmute @user`, `!tempmute @user <mins>`, `!kick @user`, `!ban @user`' },
+                { name: '⚠️ Moderation', value: '`!warn @user <reason>`, `!warnings @user`, `!clearwarns @user`, `!mute @user`, `!unmute @user`, `!tempmute @user <mins>`, `!kick @user [time] [reason]`, `!ban @user [time] [reason]`' },
                 { name: '🧹 Channel Control', value: '`!clear <1-100>`, `!slowmode <seconds/off>`, `!lockchannel`, `!unlockchannel`' },
-                { name: '💰 Economy Admin', value: '`!addcoins @user <amount>`, `!removecoins @user <amount>`, `!setcoins @user <amount>`, `!resetcoins @user`, `!baltable`' }
+                { name: '💰 Economy Admin', value: '`!addcoins @user <amount>`, `!removecoins @user <amount>`, `!setcoins @user <amount>`, `!resetcoins @user`, `!baltable`, `!approvesuggest <userId>`, `!rejectsuggest <userId> <reason>`' }
             );
 
         return message.channel.send({ embeds: [embed] });
+    }
+
+    // BACKUP JSON LEDGER SNAPSHOT
+    if (command === '!backupjson') {
+        if (!isAdmin(message.member)) return message.reply('❌ Admin only.');
+
+        try {
+            const users = await User.find().sort({ coins: -1 });
+            const backupData = users.map(u => ({ userId: u.id, coins: u.coins, warnings: u.warnings, xp: u.xp }));
+            const jsonBuffer = Buffer.from(JSON.stringify(backupData, null, 4), 'utf-8');
+
+            return message.channel.send({
+                content: '📥 **BALANCES.JSON complete backup compile generated successfully.** Live architecture records maintained securely.',
+                files: [{ attachment: jsonBuffer, name: 'BALANCES.JSON' }]
+            });
+        } catch (err) {
+            return message.reply('❌ Failed to compile snapshot file.');
+        }
     }
 
     // AI COMMAND POWERED BY GROQ
@@ -402,7 +439,7 @@ client.on('messageCreate', async message => {
                     .setColor('#FF4500')
                     .setTitle('🔥 Links')
                     .setDescription(
-                        '🎥 YouTube: https://www.youtube.com/@redflamingarrowlive\n🔮 Twitch: https://twitch.tv/redflamingarrow_'
+                        '🎥 YouTube: https://www.youtube.com/@redflamingarrowliven🔮 Twitch: https://twitch.tv/redflamingarrow_'
                     )
             ]
         });
@@ -459,7 +496,16 @@ client.on('messageCreate', async message => {
         lastDaily[message.author.id] = now;
         await userData.save();
 
-        return message.reply('📆 Daily claimed: 🪙 **+100**');
+        message.reply('📆 Daily claimed: 🪙 **+100**');
+
+        // 📥 FEATURE 3: Daily Cooldown Reminder DM Pipeline
+        setTimeout(async () => {
+            const userObj = await client.users.fetch(message.author.id).catch(() => null);
+            if (userObj) {
+                await userObj.send('📆 **Yo bro! Your daily reward timer just reset.** Head back into the server and run `!daily` to grab your free 🪙 **100 coins**, gng!').catch(() => {});
+            }
+        }, 86400000);
+        return;
     }
 
     if (command === '!work') {
@@ -473,7 +519,16 @@ client.on('messageCreate', async message => {
         lastWorked[message.author.id] = now;
         await userData.save();
 
-        return message.reply(`💼 You worked and earned 🪙 **${pay}**.`);
+        message.reply(`💼 You worked and earned 🪙 **${pay}**.`);
+
+        // 📥 FEATURE 3: Work Cooldown Reminder DM Pipeline
+        setTimeout(async () => {
+            const userObj = await client.users.fetch(message.author.id).catch(() => null);
+            if (userObj) {
+                await userObj.send('💼 **Your work shift is ready!** Run `!work` right now to earn more coins, bro!').catch(() => {});
+            }
+        }, 3600000);
+        return;
     }
 
     if (command === '!pay') {
@@ -535,6 +590,34 @@ client.on('messageCreate', async message => {
         }
     }
 
+    // 🎟️ FEATURE 4: Anonymous Suggestion Status DMs
+    if (command === '!approvesuggest') {
+        if (!isAdmin(message.member)) return message.reply('❌ Admin only.');
+        const targetId = args[1];
+        if (!targetId) return message.reply('❌ Usage: `!approvesuggest <userId>`');
+
+        const userObj = await client.users.fetch(targetId).catch(() => null);
+        if (userObj) {
+            await userObj.send(`🎟️ **Suggestion Approved!** Yo gng, an admin reviewed your suggestion in **${message.guild.name}** and officially approved it! Keep the fire ideas coming, bro!`).catch(() => {});
+            return message.reply('✅ User notified of approval via secure DM.');
+        }
+        return message.reply('❌ Could not locate user object file records.');
+    }
+
+    if (command === '!rejectsuggest') {
+        if (!isAdmin(message.member)) return message.reply('❌ Admin only.');
+        const targetId = args[1];
+        const reason = args.slice(2).join(' ') || 'No specific reason given.';
+        if (!targetId) return message.reply('❌ Usage: `!rejectsuggest <userId> <reason>`');
+
+        const userObj = await client.users.fetch(targetId).catch(() => null);
+        if (userObj) {
+            await userObj.send(`🎟️ **Suggestion Update:** Your recent suggestion in **${message.guild.name}** was reviewed. Unfortunately, it was turned down for this reason:\n📝 *"${reason}"*\nAppreciate you dropping ideas though, gng!`).catch(() => {});
+            return message.reply('✅ User notified of denial metrics.');
+        }
+        return message.reply('❌ User records unreached.');
+    }
+
     // CASINO
     if (command === '!coinflip') {
         const choice = args[1]?.toLowerCase();
@@ -556,7 +639,15 @@ client.on('messageCreate', async message => {
 
         userData.coins -= bet;
         await userData.save();
-        return message.reply(`🪙 It landed **${result}**. You lost 🪙 **${bet}**.`);
+        message.reply(`🪙 It landed **${result}**. You lost 🪙 **${bet}**.`);
+
+        // 🎰 FEATURE 2: High-Roller Casino Crash DM Notice
+        if (bet >= 5000) {
+            try {
+                await message.author.send(`💀 **HIGH ROLLER RIP:** Bro, you just blew 🪙 **${bet} coins** on a coinflip in **${message.guild.name}**... Absolute devastating throw, you are completely cooked gng. Go run some commands and get that bag back!`);
+            } catch {}
+        }
+        return;
     }
 
     if (command === '!blackjack' || command === '!bj') {
@@ -578,7 +669,15 @@ client.on('messageCreate', async message => {
 
         userData.coins -= bet;
         await userData.save();
-        return message.reply(`🃏 You: **${player}** | Dealer: **${dealer}**\n💀 You lost 🪙 **${bet}**.`);
+        message.reply(`🃏 You: **${player}** | Dealer: **${dealer}**\n💀 You lost 🪙 **${bet}**.`);
+
+        // 🎰 FEATURE 2: High-Roller Casino Crash DM Notice
+        if (bet >= 5000) {
+            try {
+                await message.author.send(`🃏 **CASINO BANKRUPT:** You really let the dealer crush you for 🪙 **${bet} coins** in blackjack?? Bro is down tremendous, absolute tragedy, fr. Go grind some text chats to rebuild!`);
+            } catch {}
+        }
+        return;
     }
 
     if (command === '!gamble') {
@@ -607,7 +706,13 @@ client.on('messageCreate', async message => {
 
             userData.coins -= bet;
             await userData.save();
-            return message.reply(`🎰 [ ${roll.join(' | ')} ]\n💀 Lost 🪙 **${bet}**.`);
+            message.reply(`🎰 [ ${roll.join(' | ')} ]\n💀 Lost 🪙 **${bet}**.`);
+
+            // 🎰 FEATURE 2: High-Roller Casino Crash DM Notice
+            if (bet >= 5000) {
+                try { await message.author.send(`🎰 **SLOTS DEVASTATION:** The slot machine just scammed you out of 🪙 **${bet} coins** in **${message.guild.name}**. Bro is down astronomical!`); } catch {}
+            }
+            return;
         }
 
         const roll = Math.floor(Math.random() * 6) + 1;
@@ -619,7 +724,13 @@ client.on('messageCreate', async message => {
 
         userData.coins -= bet;
         await userData.save();
-        return message.reply(`🎲 Rolled **${roll}**. You lost 🪙 **${bet}**.`);
+        message.reply(`🎲 Rolled **${roll}**. You lost 🪙 **${bet}**.`);
+
+        // 🎰 FEATURE 2: High-Roller Casino Crash DM Notice
+        if (bet >= 5000) {
+            try { await message.author.send(`🎲 **DICE ROAST:** You bet 🪙 **${bet}** on a dice rolling system and rolled a tiny **${roll}**?? Complete throw, you are baked, bro.`); } catch {}
+        }
+        return;
     }
 
     if (command === '!rob') {
@@ -655,17 +766,7 @@ client.on('messageCreate', async message => {
         const q = args.slice(1).join(' ');
         if (!q) return message.reply('🎱 Ask a question.');
 
-        const answers = [
-            'Yes.',
-            'No.',
-            'Probably.',
-            'Definitely.',
-            'Bro is cooked.',
-            'Ask again later.',
-            'Absolutely not.',
-            'Looks good.'
-        ];
-
+        const answers = ['Yes.', 'No.', 'Probably.', 'Definitely.', 'Bro is cooked.', 'Ask again later.', 'Absolutely not.', 'Looks good.'];
         return message.reply(`🎱 ${answers[Math.floor(Math.random() * answers.length)]}`);
     }
 
@@ -683,11 +784,7 @@ client.on('messageCreate', async message => {
             (choice === 'rock' && bot === 'scissors') ||
             (choice === 'paper' && bot === 'rock') ||
             (choice === 'scissors' && bot === 'paper')
-        ) {
-            result = 'You win.';
-        } else if (choice !== bot) {
-            result = 'I win.';
-        }
+        ) { result = 'You win.'; } else if (choice !== bot) { result = 'I win.'; }
 
         return message.reply(`✊ You: **${choice}** | Bot: **${bot}**\n${result}`);
     }
@@ -767,9 +864,7 @@ client.on('messageCreate', async message => {
             return message.reply('❌ Usage: `!golive twitch/youtube <title>`');
         }
 
-        const url = platform === 'twitch'
-            ? 'https://twitch.tv/redflamingarrow_'
-            : 'https://www.youtube.com/@redflamingarrowlive';
+        const url = platform === 'twitch' ? 'https://twitch.tv/redflamingarrow_' : 'https://www.youtube.com/@redflamingarrowlive';
 
         const embed = new EmbedBuilder()
             .setColor(platform === 'twitch' ? '#9146FF' : '#FF0000')
@@ -778,15 +873,11 @@ client.on('messageCreate', async message => {
             .addFields({ name: '🌐 Link', value: url })
             .setTimestamp();
 
-        await message.channel.send({
-            content: `<@&${STREAM_PING_ROLE_ID}>`,
-            embeds: [embed]
-        });
-
+        await message.channel.send({ content: `<@&${STREAM_PING_ROLE_ID}>`, embeds: [embed] });
         return message.delete().catch(() => {});
     }
 
-    // MODERATION
+    // MODERATION COMMANDS (INTEGRATED DM PACKETS + LEADERSHIP NOTICES)
     if (command === '!clear' || command === '!purge') {
         if (!isStaff(message.member)) return message.reply('❌ Trial Mod+ only.');
 
@@ -811,16 +902,33 @@ client.on('messageCreate', async message => {
         targetData.warnings += 1;
         await targetData.save();
 
+        const reason = args.slice(2).join(' ') || 'No reason provided.';
+
+        // Notify user via DM
+        try { await target.send(`⚠️ **You have received an official warning in ${message.guild.name}**\n📝 **Reason:** ${reason}\n📊 **Active Warnings:** ${targetData.warnings}/3`); } catch {}
+
         await message.channel.send(`⚠️ ${target} warned. Active warnings: **${targetData.warnings}/3**`);
 
+        // 🚨 FEATURE 1: Send Leadership Audit DM
+        const auditEmbed = new EmbedBuilder()
+            .setColor('#FFA500')
+            .setTitle('🚨 Staff Action Ledger: Warning Logged')
+            .addFields(
+                { name: 'Staff Member', value: `<@${message.author.id}>`, inline: true },
+                { name: 'Target User', value: `<@${target.id}>`, inline: true },
+                { name: 'Reason Given', value: reason }
+            ).setTimestamp();
+        await dmServerLeadership(message.guild, auditEmbed);
+
+        // Auto-kick implementation
         if (targetData.warnings >= 3) {
             if (!target.kickable) return message.channel.send('❌ Cannot auto-kick this user.');
+            try { await target.send(`🥾 **You have been auto-kicked from ${message.guild.name}** for reaching 3 active warnings.`); } catch {}
             await target.kick('Reached 3 warnings.');
             targetData.warnings = 0;
             await targetData.save();
             return message.channel.send('🥾 User auto-kicked for 3 warnings.');
         }
-
         return;
     }
 
@@ -851,9 +959,14 @@ client.on('messageCreate', async message => {
         const role = message.guild.roles.cache.get(MUTE_ROLE_ID);
 
         if (!target || !role) return message.reply('❌ Missing target or mute role.');
-
         await target.roles.add(role);
-        return message.reply(`🤫 Muted ${target}.`);
+        message.reply(`🤫 Muted ${target}.`);
+
+        // User Notice + Leadership Audit
+        try { await target.send(`🤫 **You have been muted in ${message.guild.name}** by a staff member.`); } catch {}
+        const auditEmbed = new EmbedBuilder().setColor('#FF8C00').setTitle('🤫 Staff Action: User Muted').addFields({ name: 'Staff', value: `<@${message.author.id}>`, inline: true }, { name: 'Target', value: `<@${target.id}>`, inline: true }).setTimestamp();
+        await dmServerLeadership(message.guild, auditEmbed);
+        return;
     }
 
     if (command === '!unmute') {
@@ -863,9 +976,11 @@ client.on('messageCreate', async message => {
         const role = message.guild.roles.cache.get(MUTE_ROLE_ID);
 
         if (!target || !role) return message.reply('❌ Missing target or mute role.');
-
         await target.roles.remove(role);
-        return message.reply(`🔊 Unmuted ${target}.`);
+        message.reply(`🔊 Unmuted ${target}.`);
+
+        try { await target.send(`🔊 **You have been unmuted in ${message.guild.name}**.`); } catch {}
+        return;
     }
 
     if (command === '!tempmute') {
@@ -880,13 +995,109 @@ client.on('messageCreate', async message => {
         await target.roles.add(role);
         message.reply(`🤫 Muted ${target} for **${minutes}m**.`);
 
+        try { await target.send(`🤫 **You have been temporarily muted in ${message.guild.name}** for **${minutes}m**.`); } catch {}
+
         setTimeout(async () => {
             try {
                 await target.roles.remove(role);
                 message.channel.send(`🔊 ${target} was automatically unmuted.`);
+                await target.send(`🔊 Your temporary mute in **${message.guild.name}** has expired.`);
             } catch {}
         }, minutes * 60000);
+        return;
+    }
 
+    if (command === '!kick') {
+        if (!isMod(message.member)) return message.reply('❌ Mod+ only.');
+
+        const target = message.mentions.members.first();
+        if (!target) return message.reply('❌ Mention a user.');
+        if (!target.kickable) return message.reply('❌ I cannot kick that user.');
+
+        let timeArg = args[2];
+        let duration = null;
+        let reasonIndex = 2;
+
+        if (timeArg && (timeArg.endsWith('m') || timeArg.endsWith('h') || timeArg.endsWith('d'))) {
+            const timeValue = parseInt(timeArg);
+            if (!isNaN(timeValue)) {
+                reasonIndex = 3;
+                if (timeArg.endsWith('m')) duration = timeValue * 60000;
+                if (timeArg.endsWith('h')) duration = timeValue * 3600000;
+                if (timeArg.endsWith('d')) duration = timeValue * 86400000;
+            }
+        }
+
+        const reason = args.slice(reasonIndex).join(' ') || 'No reason provided.';
+
+        try { await target.send(`⚠️ **You have been kicked from ${message.guild.name}**\n📝 **Reason:** ${reason}${duration ? `\n⏱️ **Invite Hold Duration:** ${timeArg}` : ''}`); } catch {}
+
+        await target.kick(reason);
+        message.reply(`% Kicked **${target.user.username}**.`);
+
+        // 🚨 FEATURE 1: Audit Log Notice DM to Leadership
+        const auditEmbed = new EmbedBuilder().setColor('#FF0000').setTitle('🥾 Staff Action: User Kicked').addFields({ name: 'Staff Member', value: `<@${message.author.id}>`, inline: true }, { name: 'Target User', value: `${target.user.tag} (${target.id})`, inline: true }, { name: 'Hold Timer', value: duration ? timeArg : 'None', inline: true }, { name: 'Reason', value: reason }).setTimestamp();
+        await dmServerLeadership(message.guild, auditEmbed);
+
+        // Delayed Re-invite Logic Engine
+        if (duration) {
+            const targetUser = target.user;
+            setTimeout(async () => {
+                try {
+                    const invite = await message.guild.channels.cache.filter(c => c.type === 0).first().createInvite({ maxAge: 86400, maxUses: 1, reason: 'Temporary kick expiration gateway.' });
+                    await targetUser.send(`👋 Yo bro, your kick hold window for **${message.guild.name}** has passed. You can join back up via this link: ${invite.url}`);
+                } catch {}
+            }, duration);
+        }
+        return;
+    }
+
+    if (command === '!ban' || command === '!tempban') {
+        if (!isAdmin(message.member)) return message.reply('❌ Admin only.');
+
+        const target = message.mentions.members.first();
+        if (!target) return message.reply('❌ Mention a user.');
+        if (!target.bannable) return message.reply('❌ I cannot ban that user.');
+
+        let timeArg = args[2];
+        let duration = null;
+        let reasonIndex = 2;
+
+        if (timeArg && (timeArg.endsWith('m') || timeArg.endsWith('h') || timeArg.endsWith('d'))) {
+            const timeValue = parseInt(timeArg);
+            if (!isNaN(timeValue)) {
+                reasonIndex = 3;
+                if (timeArg.endsWith('m')) duration = timeValue * 60000;
+                if (timeArg.endsWith('h')) duration = timeValue * 3600000;
+                if (timeArg.endsWith('d')) duration = timeValue * 86400000;
+            }
+        }
+
+        const reason = args.slice(reasonIndex).join(' ') || 'No reason provided.';
+        const targetUser = target.user;
+
+        try { await target.send(`🔨 **You have been BANNED from ${message.guild.name}**\n📝 **Reason:** ${reason}\n⏱️ **Type:** ${duration ? `Temporary Ban (${timeArg})` : 'Permanent Ban'}`); } catch {}
+
+        await target.ban({ reason });
+        message.reply(`🔨 Banned **${targetUser.username}**.`);
+
+        // 🚨 FEATURE 1: Audit Log Notice DM to Leadership
+        const auditEmbed = new EmbedBuilder().setColor('#8B0000').setTitle('🔨 Staff Action: Server Ban Issued').addFields({ name: 'Staff', value: `<@${message.author.id}>`, inline: true }, { name: 'Target User', value: `${targetUser.tag}`, inline: true }, { name: 'Type/Duration', value: duration ? `Temp (${timeArg})` : 'Permanent', inline: true }, { name: 'Reason', value: reason }).setTimestamp();
+        await dmServerLeadership(message.guild, auditEmbed);
+
+        // Tempban Unban + Re-invite Automation Core
+        if (duration) {
+            setTimeout(async () => {
+                try {
+                    const banList = await message.guild.bans.fetch();
+                    if (banList.has(targetUser.id)) {
+                        await message.guild.members.unban(targetUser.id, 'Temporary ban matrix expired.');
+                        const invite = await message.guild.channels.cache.filter(c => c.type === 0).first().createInvite({ maxAge: 86400, maxUses: 1, reason: 'Temporary ban entry release re-invite.' });
+                        await targetUser.send(`🔓 Yo bro, your temp ban from **${message.guild.name}** has expired completely! Use this link to get back in: ${invite.url}`);
+                    }
+                } catch {}
+            }, duration);
+        }
         return;
     }
 
@@ -902,9 +1113,7 @@ client.on('messageCreate', async message => {
         }
 
         const seconds = cleanAmount(rate);
-        if (seconds === null || seconds < 0 || seconds > 21600) {
-            return message.reply('❌ Invalid seconds.');
-        }
+        if (seconds === null || seconds < 0 || seconds > 21600) return message.reply('❌ Invalid seconds.');
 
         await message.channel.setRateLimitPerUser(seconds);
         return message.reply(`📶 Slowmode set to **${seconds}s**.`);
@@ -912,57 +1121,31 @@ client.on('messageCreate', async message => {
 
     if (command === '!lockchannel') {
         if (!isMod(message.member)) return message.reply('❌ Mod+ only.');
-
-        await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, {
-            SendMessages: false
-        });
-
+        await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: false });
         return message.reply('🔒 Channel locked.');
     }
 
     if (command === '!unlockchannel') {
         if (!isMod(message.member)) return message.reply('❌ Mod+ only.');
-
-        await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, {
-            SendMessages: null
-        });
-
+        await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: null });
         return message.reply('🔓 Channel unlocked.');
     }
 
-    if (command === '!kick') {
-        if (!isMod(message.member)) return message.reply('❌ Mod+ only.');
-
-        const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Mention a user.');
-        if (!target.kickable) return message.reply('❌ I cannot kick that user.');
-
-        await target.kick(args.slice(2).join(' ') || 'No reason provided.');
-        return message.reply(`🥾 Kicked ${target.user.username}.`);
-    }
-
-    if (command === '!ban') {
-        if (!isAdmin(message.member)) return message.reply('❌ Admin only.');
-
-        const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Mention a user.');
-        if (!target.bannable) return message.reply('❌ I cannot ban that user.');
-
-        await target.ban({ reason: args.slice(2).join(' ') || 'No reason provided.' });
-        return message.reply(`🔨 Banned ${target.user.username}.`);
-    }
-
-    // ECONOMY ADMIN
+    // ECONOMY ADMIN (INTEGRATED FEATURE 5: SENSITIVE COIN BALANCES AUDIT LEDGER DMS)
     if (command === '!addcoins' || command === '!givecoins') {
         if (!isAdmin(message.member)) return message.reply('❌ Admin only.');
 
         const target = message.mentions.members.first();
         const amount = cleanAmount(args[2]);
-
         if (!target || !amount || amount <= 0) return message.reply('❌ Usage: `!addcoins @user <amount>`');
 
         await User.updateOne({ id: target.id }, { $inc: { coins: amount } }, { upsert: true });
-        return message.reply(`💸 Added 🪙 **${amount}** to ${target.user.username}.`);
+        message.reply(`💸 Added 🪙 **${amount}** to ${target.user.username}.`);
+
+        // 🤫 FEATURE 5: Secret Balance Manipulation Audit Log DM to Admins/Owner
+        const auditEmbed = new EmbedBuilder().setColor('#00FF7F').setTitle('💰 Secret Ledger Audit: Coins Injected').addFields({ name: 'Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Recipient User', value: `<@${target.id}>`, inline: true }, { name: 'Amount Transferred', value: `🪙 ${amount} Flame Coins`, inline: true }).setTimestamp();
+        await dmServerLeadership(message.guild, auditEmbed);
+        return;
     }
 
     if (command === '!removecoins' || command === '!deductcoins') {
@@ -970,14 +1153,17 @@ client.on('messageCreate', async message => {
 
         const target = message.mentions.members.first();
         const amount = cleanAmount(args[2]);
-
         if (!target || !amount || amount <= 0) return message.reply('❌ Usage: `!removecoins @user <amount>`');
 
         const targetData = await getUser(target.id);
         targetData.coins = Math.max(0, targetData.coins - amount);
         await targetData.save();
 
-        return message.reply(`📉 Removed 🪙 **${amount}** from ${target.user.username}.`);
+        message.reply(`📉 Removed 🪙 **${amount}** from ${target.user.username}.`);
+
+        const auditEmbed = new EmbedBuilder().setColor('#FF4500').setTitle('💰 Secret Ledger Audit: Coins Deducted').addFields({ name: 'Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target User', value: `<@${target.id}>`, inline: true }, { name: 'Amount Removed', value: `🪙 ${amount} Flame Coins`, inline: true }).setTimestamp();
+        await dmServerLeadership(message.guild, auditEmbed);
+        return;
     }
 
     if (command === '!setcoins') {
@@ -985,11 +1171,15 @@ client.on('messageCreate', async message => {
 
         const target = message.mentions.members.first();
         const amount = cleanAmount(args[2]);
-
         if (!target || amount === null || amount < 0) return message.reply('❌ Usage: `!setcoins @user <amount>`');
 
         await User.updateOne({ id: target.id }, { $set: { coins: amount } }, { upsert: true });
-        return message.reply(`🔧 Set ${target.user.username}'s coins to 🪙 **${amount}**.`);
+        message.reply(`🔧 Set ${target.user.username}'s coins to 🪙 **${amount}**.`);
+
+        // 🤫 FEATURE 5: Secret Balance Manipulation Audit Log DM to Admins/Owner
+        const auditEmbed = new EmbedBuilder().setColor('#1E90FF').setTitle('💰 Secret Ledger Audit: Balance Overridden').addFields({ name: 'Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target User', value: `<@${target.id}>`, inline: true }, { name: 'New Set Balance', value: `🪙 ${amount} Flame Coins`, inline: true }).setTimestamp();
+        await dmServerLeadership(message.guild, auditEmbed);
+        return;
     }
 
     if (command === '!resetcoins') {
@@ -999,7 +1189,12 @@ client.on('messageCreate', async message => {
         if (!target) return message.reply('❌ Usage: `!resetcoins @user`');
 
         await User.updateOne({ id: target.id }, { $set: { coins: 0 } }, { upsert: true });
-        return message.reply(`🧹 Reset ${target.user.username}'s coins.`);
+        message.reply(`🧹 Reset ${target.user.username}'s coins.`);
+
+        // 🤫 FEATURE 5: Secret Balance Manipulation Audit Log DM to Admins/Owner
+        const auditEmbed = new EmbedBuilder().setColor('#DCDCDC').setTitle('💰 Secret Ledger Audit: Balance Purged').addFields({ name: 'Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target User', value: `<@${target.id}>`, inline: true }).setTimestamp();
+        await dmServerLeadership(message.guild, auditEmbed);
+        return;
     }
 
     if (command === '!baltable' || command === '!balancetable') {
