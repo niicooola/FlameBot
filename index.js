@@ -1,6 +1,6 @@
 /**
  * @file index.js
- * @description FlameBot Core Engine — Version 1.5 (Dynamic Multi-Choice Prediction Update)
+ * @description FlameBot Core Engine — Version 1.7 (Stream Outcome Trigger Update)
  * @author Silas Benjamin Fawcett (Nico)
  */
 
@@ -33,17 +33,32 @@ const MUTE_ROLE_ID = process.env.MUTE_ROLE_ID || '1509040670801789019';
 const STREAM_PING_ROLE_ID = process.env.STREAM_PING_ROLE_ID || '1503627239713935452';
 const SR_MEMBER_ROLE_ID = 'YOUR_SR_MEMBER_ROLE_ID_HERE'; 
 
+// RE-ADJUSTED INFLATION PRICING MATRIX
+const VIP_PRICE = 75000;
+const BOOSTER_PRICE = 35000;
+const COLOR_PRICE = 50000;
+const ORACLE_PRICE = 25000;
+const TITLE_PRICE = 40000;
+const SHIELD_PRICE = 15000;
+
 // SYSTEM STATE MATRIX
 let systemLogsEnabled = true; 
 
 // ECONOMY PARAMS
 const PREFIX = '!';
-const VIP_PRICE = 10000;
 const CHAT_INCOME = 5;
 const CASINO_COOLDOWN = 30000; 
 
-// LIVE STREAM STOCK MARKET STATE
-let currentStockPrice = 100; 
+// DYNAMIC CORE STOCK ENGINE PARAMETERS
+let currentStockPrice = 100.0; 
+let stockVolatilityModifier = 1.0; 
+let stockHistoryArray = [100.0, 98.5, 101.2, 103.0, 99.1, 102.4]; 
+let historicalCandlesticks = ['🟩 $102.40', '🟥 $99.10', '🟩 $103.00', '🟩 $101.20']; 
+
+// Track candle intervals
+let minuteHigh = 100.0;
+let minuteLow = 100.0;
+let minuteOpen = 100.0;
 
 // MULTI-CHOICE PREDICTION SYSTEM STATE
 let activePoll = null; 
@@ -129,6 +144,11 @@ function cleanAmount(value) {
     return Number.isFinite(n) ? n : null;
 }
 
+function cleanFloat(value) {
+    const f = parseFloat(value);
+    return Number.isFinite(f) ? f : null;
+}
+
 async function dmServerLeadership(guild, embed) {
     if (!systemLogsEnabled) return;
 
@@ -168,6 +188,33 @@ http.createServer((req, res) => {
 
 client.once('ready', () => {
     console.log(`🔥 FlameBot logged in as ${client.user.tag}`);
+    
+    // AUTOMATED MINUTE TICK ENGINE MATRIX (Updates every 60 seconds)
+    setInterval(() => {
+        const varianceBase = (Math.random() * 4.9) + 0.1;
+        const changeVolume = varianceBase * stockVolatilityModifier;
+        const trendDirection = Math.random() > 0.48 ? 1 : -1; 
+        
+        const finalPriceAdjustment = changeVolume * trendDirection;
+        currentStockPrice = Math.max(1.0, parseFloat((currentStockPrice + finalPriceAdjustment).toFixed(2)));
+        
+        if (currentStockPrice > minuteHigh) minuteHigh = currentStockPrice;
+        if (currentStockPrice < minuteLow) minuteLow = currentStockPrice;
+        
+        const indicatorIcon = currentStockPrice >= minuteOpen ? '🟩' : '🟥';
+        const formattedCandleString = `${indicatorIcon} **Close:** $${currentStockPrice.toFixed(2)} *(High: $${minuteHigh.toFixed(2)} | Low: $${minuteLow.toFixed(2)})*`;
+        
+        historicalCandlesticks.unshift(formattedCandleString);
+        if (historicalCandlesticks.length > 8) historicalCandlesticks.pop();
+        
+        stockHistoryArray.unshift(currentStockPrice);
+        if (stockHistoryArray.length > 15) stockHistoryArray.pop();
+        
+        minuteOpen = currentStockPrice;
+        minuteHigh = currentStockPrice;
+        minuteLow = currentStockPrice;
+        
+    }, 60000);
 });
 
 client.on('guildMemberAdd', async member => {
@@ -185,6 +232,22 @@ client.on('guildMemberAdd', async member => {
 // ==========================================
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
+
+    // TARGETED CHAT MARKET SHIFT TRIGGER VECTOR
+    const streamIdentifierRoleNames = ['Owner/Streamer', 'RedFlame', 'Streamer'];
+    const isStreamerSpeaking = message.member.roles.cache.some(r => streamIdentifierRoleNames.includes(r.name)) || message.author.id === '1511458646348009573'; 
+
+    if (isStreamerSpeaking) {
+        if (Math.random() < 0.85) {
+            const hypePumpValue = parseFloat(((Math.random() * 4.0) + 1.0).toFixed(2)) * stockVolatilityModifier;
+            currentStockPrice = parseFloat((currentStockPrice + hypePumpValue).toFixed(2));
+            if (currentStockPrice > minuteHigh) minuteHigh = currentStockPrice;
+        } else {
+            const dynamicDipValue = parseFloat(((Math.random() * 2.0) + 0.1).toFixed(2)) * stockVolatilityModifier;
+            currentStockPrice = Math.max(1.0, parseFloat((currentStockPrice - dynamicDipValue).toFixed(2)));
+            if (currentStockPrice < minuteLow) minuteLow = currentStockPrice;
+        }
+    }
 
     const userData = await getUser(message.author.id);
 
@@ -365,7 +428,7 @@ client.on('messageCreate', async message => {
                 { name: '📣 Utilities', value: '`!links`, `!suggest`, `!afk`, `!say`, `!announce`' },
                 { name: '🛡️ Staff Only', value: '`!staffhelp`' }
             )
-            .setFooter({ text: 'FlameBot | Version 1.5' })
+            .setFooter({ text: 'FlameBot | Version 1.7' })
             .setTimestamp();
 
         return message.channel.send({ embeds: [embed] });
@@ -378,8 +441,8 @@ client.on('messageCreate', async message => {
             .setColor('#2F3136')
             .setTitle('🛡️ Staff Command Directory')
             .addFields(
-                { name: '🗳️ Prediction Administration', value: '`!openpoll <item 1> | <item 2> | ...`, `!endpoll <winning_number>`' },
-                { name: '📈 Market Controls', value: '`!setstock <price>`' },
+                { name: '📺 Live Stream Feeds', value: '`!stream win [multiplier]`, `!stream loss [multiplier]`' },
+                { name: '📈 Market Controls', value: '`!setmodifier <multiplier>`, `!openpoll <item 1> | <item 2> | ...`, `!endpoll <winning_number>`' },
                 { name: '⚠️ Moderation', value: '`!warn @user <reason>`, `!warnings @user`, `!clearwarns @user`, `!mute @user`, `!unmute @user`, `!tempmute @user <mins>`, `!kick @user [time] [reason]`, `!ban @user [time] [reason]`' },
                 { name: '🧹 Channel Controls', value: '`!clear <1-100>`, `!slowmode <seconds/off>`, `!lockchannel`, `!unlockchannel`' },
                 { name: '💰 Economy Admin', value: '`!addcoins @user <amount>`, `!removecoins @user <amount>`, `!setcoins @user <amount>`, `!resetcoins @user`, `!baltable`, `!approvesuggest <userId>`, `!rejectsuggest <userId> <reason>`' },
@@ -407,11 +470,10 @@ client.on('messageCreate', async message => {
 
         const multiplierX = choiceOptions.length * 1.5;
 
-        // Initialize structured local session memory
         activePoll = {
             choices: choiceOptions,
             multiplier: multiplierX,
-            wagers: {} // Format structure: { 'userId': { choiceIndex: X, amount: Y } }
+            wagers: {} 
         };
 
         const displayLines = choiceOptions.map((text, index) => `**[${index + 1}]** — ${text}`).join('\n');
@@ -442,11 +504,9 @@ client.on('messageCreate', async message => {
 
         if (userData.coins < betAmount) return message.reply(`❌ Insolvent. You don't have enough coins to place a ${betAmount} coin bet.`);
 
-        // Deduct capital
         userData.coins -= betAmount;
         await userData.save();
 
-        // Assign to index mapping tracker
         if (!activePoll.wagers[message.author.id]) {
             activePoll.wagers[message.author.id] = [];
         }
@@ -476,7 +536,6 @@ client.on('messageCreate', async message => {
         let distributedWinnersCount = 0;
         let netPayoutVolume = 0;
 
-        // Process loop matrix allocations
         for (const [userId, userBetsArray] of Object.entries(activePoll.wagers)) {
             let userTotalWinnings = 0;
 
@@ -504,24 +563,83 @@ client.on('messageCreate', async message => {
     // ==========================================
 
     if (command === '!stock') {
-        return message.reply(`📈 **Flame Stock Exchange:** The current price of **$FLME** is 🪙 **${currentStockPrice} coins** per share.\nUse \`!buystock\` or \`!sellstock\` to play the market!`);
+        const chartLinesText = historicalCandlesticks.join('\n') || '*Awaiting minute interval logs validation...*';
+        
+        const marketEmbed = new EmbedBuilder()
+            .setColor(historicalCandlesticks[0]?.includes('🟩') ? '#00FF00' : '#FF0000')
+            .setTitle('📈 RedFlame Live Stream Stock Index ($FLME)')
+            .setDescription(`Real-time performance indicators linked directly to chat activity metrics.\n\n💵 **Current Value:** \`$${currentStockPrice.toFixed(2)} Flame Coins\`\n⚙️ **Active Volatility Modifier:** \`${stockVolatilityModifier.toFixed(1)}x\``)
+            .addFields(
+                { name: '📊 Historical Candlestick Stream Data (image_87350e.png Simulation)', value: `\`\`\`md\n${chartLinesText}\n\`\`\`` }
+            )
+            .setFooter({ text: 'Refreshes ticks automatically every 1 minute.' })
+            .setTimestamp();
+
+        return message.channel.send({ embeds: [marketEmbed] });
     }
 
-    if (command === '!setstock') {
+    // STREAM OUTCOME FEED TRIGGERS
+    if (command === '!stream') {
         if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
-        const newPrice = cleanAmount(args[1]);
-        if (!newPrice || newPrice <= 0) return message.reply('❌ Usage: `!setstock <price>`');
+        
+        const action = args[1]?.toLowerCase();
+        const rawScale = args[2];
+        const intensityScale = rawScale ? (cleanFloat(rawScale) || 1.0) : 1.0;
 
-        currentStockPrice = newPrice;
-        return message.channel.send(`📈 **Market Alert:** An administrator updated the price of **$FLME** to 🪙 **${currentStockPrice} coins** per share based on stream performance!`);
+        if (!['win', 'loss', 'lose'].includes(action)) {
+            return message.reply('❌ Invalid reporting parameters. Usage: `!stream win [multiplier]` or `!stream loss [multiplier]`');
+        }
+
+        if (action === 'win') {
+            // Calculate a massive stock pump proportional to the multiplier scale passed
+            const basePump = (Math.random() * 15.0) + 10.0; // Pushes up between 10-25 coins baseline
+            const finalPumpValue = parseFloat((basePump * intensityScale * stockVolatilityModifier).toFixed(2));
+            
+            currentStockPrice = parseFloat((currentStockPrice + finalPumpValue).toFixed(2));
+            if (currentStockPrice > minuteHigh) minuteHigh = currentStockPrice;
+
+            // Instantly inject a forced green candlestick into historical arrays mimicking image_87350e.png properties
+            const injectedCandle = `🟩 **STREAM WIN PUMP:** $${currentStockPrice.toFixed(2)} *(+$${finalPumpValue.toFixed(2)})*`;
+            historicalCandlesticks.unshift(injectedCandle);
+            if (historicalCandlesticks.length > 8) historicalCandlesticks.pop();
+
+            return message.channel.send(`🚀 **MARKET PUMP:** Admins reported a live stream **VICTORY**! **$FLME** stock price has skyrocketed by **+$${finalPumpValue.toFixed(2)}**! New Price: \`$${currentStockPrice.toFixed(2)}\``);
+        }
+
+        if (action === 'loss' || action === 'lose') {
+            // Calculate a massive stock dump proportional to the multiplier scale passed
+            const baseDump = (Math.random() * 12.0) + 8.0; // Dumps between 8-20 coins baseline
+            const finalDumpValue = parseFloat((baseDump * intensityScale * stockVolatilityModifier).toFixed(2));
+            
+            currentStockPrice = Math.max(1.0, parseFloat((currentStockPrice - finalDumpValue).toFixed(2)));
+            if (currentStockPrice < minuteLow) minuteLow = currentStockPrice;
+
+            // Instantly inject a forced red candlestick into historical arrays mimicking image_87350e.png properties
+            const injectedCandle = `🟥 **STREAM CHOKE DUMP:** $${currentStockPrice.toFixed(2)} *(-$${finalDumpValue.toFixed(2)})*`;
+            historicalCandlesticks.unshift(injectedCandle);
+            if (historicalCandlesticks.length > 8) historicalCandlesticks.pop();
+
+            return message.channel.send(`📉 **MARKET CRASH:** Admins reported a live stream **LOSS / CHOKE**! **$FLME** stock values dropped hard by **-$${finalDumpValue.toFixed(2)}**! New Price: \`$${currentStockPrice.toFixed(2)}\``);
+        }
+    }
+
+    if (command === '!setmodifier' || command === '!setmultiplier') {
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
+        const targetMod = cleanFloat(args[1]);
+        if (targetMod === null || targetMod < 0.0 || targetMod > 20.0) {
+            return message.reply('❌ Usage: `!setmodifier <0.1 - 20.0>`');
+        }
+
+        stockVolatilityModifier = targetMod;
+        return message.channel.send(`⚙️ **Market Parameter Alteration:** Volatility speed modifier locked down to **${stockVolatilityModifier.toFixed(1)}x** rate efficiency.`);
     }
 
     if (command === '!buystock') {
         const sharesToBuy = cleanAmount(args[1]);
         if (!sharesToBuy || sharesToBuy <= 0) return message.reply('❌ Usage: `!buystock <amount>`');
 
-        const totalCost = sharesToBuy * currentStockPrice;
-        if (userData.coins < totalCost) return message.reply(`❌ You don't have enough coins. Buying ${sharesToBuy} shares costs 🪙 **${totalCost} coins**.`);
+        const totalCost = Math.ceil(sharesToBuy * currentStockPrice);
+        if (userData.coins < totalCost) return message.reply Atlantic(`❌ You don't have enough coins. Buying ${sharesToBuy} shares costs 🪙 **${totalCost} coins**.`);
 
         userData.coins -= totalCost;
         userData.stocks += sharesToBuy;
@@ -536,7 +654,7 @@ client.on('messageCreate', async message => {
 
         if (userData.stocks < sharesToSell) return message.reply(`❌ You only own **${userData.stocks}** shares of **$FLME**.`);
 
-        const totalPayout = sharesToSell * currentStockPrice;
+        const totalPayout = Math.floor(sharesToSell * currentStockPrice);
         userData.stocks -= sharesToSell;
         userData.coins += totalPayout;
         await userData.save();
@@ -828,21 +946,21 @@ client.on('messageCreate', async message => {
         });
     }
 
-    // COIN MARKETPLACE SHOP
+    // Commercial Marketplace
     if (command === '!shop') {
         return message.channel.send({
             embeds: [
                 new EmbedBuilder()
                     .setColor('#00FFAA')
-                    .setTitle('🏪 FlameBot Token Shop')
-                    .setDescription('Spend your coins to unlock profile enhancements and protections:')
+                    .setTitle('🏪 FlameBot Token Shop (Inflation Corrected)')
+                    .setDescription('Prices have been bumped due to economy expansion lines:')
                     .addFields(
                         { name: '💎 VIP Access Status (`!buy vip`)', value: `Price: 🪙 **${VIP_PRICE}**\nGrants exclusive access to server VIP channels.` },
-                        { name: '💸 2x Passive Income Booster (`!buy booster`)', value: 'Price: 🪙 **5,000**\nPermanently doubles all coins earned from typing messages and running commands.' },
-                        { name: '🎨 Custom Color Role (`!buy color <hex>`)', value: 'Price: 🪙 **15,000**\nCreates your own personal colored role (e.g., `!buy color #FF4500`).' },
-                        { name: '🔮 Custom 8-Ball Option (`!buy 8ball <text>`)', value: 'Price: 🪙 **8,000**\nPermanently adds your custom text response into the global `!8ball` response pool.' },
-                        { name: '🎭 Custom Profile Title (`!buy title <text>`)', value: 'Price: 🪙 **12,000**\nAppends a customized title tag onto your profile card metrics.' },
-                        { name: '🛡️ Theft Protection Shield (`!buy shield`)', value: 'Price: 🪙 **3,500**\nDeploys a one-time invisible defense matrix. Blocks the next `!rob` attempt and fines the thief.' }
+                        { name: '💸 2x Passive Income Booster (`!buy booster`)', value: `Price: 🪙 **${BOOSTER_PRICE}**\nPermanently doubles all coins earned from chat and commands.` },
+                        { name: '🎨 Custom Color Role (`!buy color <hex>`)', value: `Price: 🪙 **${COLOR_PRICE}**\nCreates your own personal colored role.` },
+                        { name: '🔮 Custom 8-Ball Option (`!buy 8ball <text>`)', value: `Price: 🪙 **${ORACLE_PRICE}**\nPermanently appends your custom response into the global 8ball pool.` },
+                        { name: '🎭 Custom Profile Title (`!buy title <text>`)', value: `Price: 🪙 **${TITLE_PRICE}**\nAppends a customized title tag onto your profile card metrics.` },
+                        { name: '🛡️ Theft Protection Shield (`!buy shield`)', value: `Price: 🪙 **${SHIELD_PRICE}**\nBlocks the next robbery attempt and counter-fines the thief.` }
                     )
             ]
         });
@@ -853,36 +971,36 @@ client.on('messageCreate', async message => {
         if (!productKey) return message.reply('❌ Missing item label. Usage: `!buy <item_name> [parameters]`');
 
         if (productKey === 'vip') {
-            if (userData.coins < VIP_PRICE) return message.reply('❌ Purchase Error: You do not have enough coins.');
+            if (userData.coins < VIP_PRICE) return message.reply(`❌ Purchase Error: You need 🪙 **${VIP_PRICE} coins**.`);
             const targetRole = message.guild.roles.cache.get(VIP_ROLE_ID);
-            if (!targetRole) return message.reply('❌ System Error: VIP role mapping missing from configurations.');
+            if (!targetRole) return message.reply('❌ System Error: VIP role mapping configuration error.');
             try {
                 await message.member.roles.add(targetRole);
                 userData.coins -= VIP_PRICE;
                 await userData.save();
                 return message.reply('🎉 **Purchase Successful:** You unlocked the premium VIP role status.');
             } catch {
-                return message.reply('❌ Permissions Error: Failed to append role to your identity card.');
+                return message.reply('❌ Permissions Error: Failed to add role.');
             }
         }
 
         if (productKey === 'booster') {
-            if (userData.hasBooster) return message.reply('❌ Upgrade Error: You already have an active passive multiplier booster.');
-            if (userData.coins < 5000) return message.reply('❌ Purchase Error: You need 🪙 **5,000 coins** to purchase a booster.');
+            if (userData.hasBooster) return message.reply('❌ Upgrade Error: Booster already active.');
+            if (userData.coins < BOOSTER_PRICE) return message.reply(`❌ Purchase Error: You need 🪙 **${BOOSTER_PRICE} coins**.`);
 
             userData.hasBooster = true;
-            userData.coins -= 5000;
+            userData.coins -= BOOSTER_PRICE;
             await userData.save();
             return message.reply('💸 **Booster Purchased:** You are now earning double coins across message channels permanently.');
         }
 
         if (productKey === 'color') {
             const hexCodeInput = args[2];
-            if (!hexCodeInput || !/^#[0-9A-F]{6}$/i.test(hexCodeInput)) return message.reply('❌ Format Error: Correct usage format: `!buy color <#HEXCODE>` (e.g., `!buy color #FF4500`)');
-            if (userData.coins < 15000) return message.reply('❌ Purchase Error: You need 🪙 **15,000 coins** to change your name color.');
+            if (!hexCodeInput || !/^#[0-9A-F]{6}$/i.test(hexCodeInput)) return message.reply('❌ Format Error: Usage format: `!buy color <#HEXCODE>`');
+            if (userData.coins < COLOR_PRICE) return message.reply(`❌ Purchase Error: You need 🪙 **${COLOR_PRICE} coins**.`);
 
             try {
-                userData.coins -= 15000;
+                userData.coins -= COLOR_PRICE;
                 await userData.save();
 
                 const newlyMintedRole = await message.guild.roles.create({
@@ -895,17 +1013,17 @@ client.on('messageCreate', async message => {
                 return message.reply(`🎨 **Color Created:** Generated and attached your custom tint matching hex code **${hexCodeInput}**.`);
             } catch (err) {
                 console.error(err);
-                return message.reply('❌ API Error: Internal role creation processing failed.');
+                return message.reply('❌ API Error: Internal role creation failed.');
             }
         }
 
         if (productKey === '8ball') {
             const userStringInjection = args.slice(2).join(' ');
-            if (!userStringInjection || userStringInjection.length < 3) return message.reply('❌ Argument Error: Correct parameter layout: `!buy 8ball <Your custom answer here>`');
-            if (userData.coins < 8000) return message.reply('❌ Purchase Error: You need 🪙 **8,000 coins** to add an answer.');
+            if (!userStringInjection || userStringInjection.length < 3) return message.reply('❌ Argument Error: Usage: `!buy 8ball <Your custom answer>`');
+            if (userData.coins < ORACLE_PRICE) return message.reply(`❌ Purchase Error: You need 🪙 **${ORACLE_PRICE} coins**.`);
 
             customEightBallAnswers.push(userStringInjection);
-            userData.coins -= 8000;
+            userData.coins -= ORACLE_PRICE;
             await userData.save();
             return message.reply(`🔮 **Database Injected:** Your custom phrase *"${userStringInjection}"* has been added to the 8-ball array.`);
         }
@@ -913,31 +1031,31 @@ client.on('messageCreate', async message => {
         if (productKey === 'title') {
             const alphanumericTitle = args.slice(2).join(' ');
             if (!alphanumericTitle || alphanumericTitle.length > 20) return message.reply('❌ Constraint Error: Custom profile titles cannot exceed 20 characters.');
-            if (userData.coins < 12000) return message.reply('❌ Purchase Error: You need 🪙 **12,000 coins** to change your title.');
+            if (userData.coins < TITLE_PRICE) return message.reply(`❌ Purchase Error: You need 🪙 **${TITLE_PRICE} coins**.`);
 
             userData.customTitle = `[${alphanumericTitle}]`;
-            userData.coins -= 12000;
+            userData.coins -= TITLE_PRICE;
             await userData.save();
             return message.reply(`🎭 **Profile Title Fixed:** Your profile title is now set to **[${alphanumericTitle}]**. View it using \`!stats\`.`);
         }
 
         if (productKey === 'shield') {
-            if (userData.hasShield) return message.reply('❌ Upgrade Error: You already have a defensive shield deployed.');
-            if (userData.coins < 3500) return message.reply('❌ Purchase Error: You need 🪙 **3,500 coins** to purchase a robbery shield.');
+            if (userData.hasShield) return message.reply('❌ Upgrade Error: Shield already deployed.');
+            if (userData.coins < SHIELD_PRICE) return message.reply(`❌ Purchase Error: You need 🪙 **${SHIELD_PRICE} coins**.`);
 
             userData.hasShield = true;
-            userData.coins -= 3500;
+            userData.coins -= SHIELD_PRICE;
             await userData.save();
             return message.reply('🛡️ **Shield Deployed:** Your account balance is now protected from the next robbery attempt.');
         }
 
-        return message.reply('❌ Item indexing error: That product does not exist. Use `!shop` to view available catalog inventory items.');
+        return message.reply('❌ Item indexing error: Product key matches nothing inside store profiles.');
     }
 
     // PROPOSALS PIPELINE
     if (command === '!suggest') {
         const suggestionContent = args.slice(1).join(' ');
-        if (!suggestionContent) return message.reply('❌ Argument Error: Please specify your suggestion idea. Usage: `!suggest <idea>`');
+        if (!suggestionContent) return message.reply('❌ Argument Error: Usage: `!suggest <idea>`');
 
         try {
             const developmentLeadIdentity = await client.users.fetch(DEV_USER_ID);
@@ -946,7 +1064,7 @@ client.on('messageCreate', async message => {
                     .setColor('#00FFFF')
                     .setTitle('🎟️ New Feature Modification Proposal')
                     .addFields(
-                        { name: 'Author Profile', value: `<@${message.author.id}> (ID: \`${message.author.id}\`)`, inline: true },
+                        { name: 'Author Profile', value: `<@${message.author.id}>`, inline: true },
                         { name: 'Source Channel', value: `<#${message.channel.id}>`, inline: true },
                         { name: 'Specifications', value: suggestionContent }
                     )
@@ -969,7 +1087,7 @@ client.on('messageCreate', async message => {
 
         const resolvedTargetUser = await client.users.fetch(targetedUserStringId).catch(() => null);
         if (resolvedTargetUser) {
-            await resolvedTargetUser.send(`🎟️ **Proposal Approved:** An administrator reviewed and officially approved your suggestion inside **${message.guild.name}**! Thanks for your input.`).catch(() => {});
+            await resolvedTargetUser.send suicide(`🎟️ **Proposal Approved:** An administrator reviewed and officially approved your suggestion inside **${message.guild.name}**! Thanks for your input.`).catch(() => {});
             return message.reply('✅ The user has been notified of their proposal approval.');
         }
         return message.reply('❌ Lookup Failure: Could not locate that user profile ID.');
@@ -990,260 +1108,7 @@ client.on('messageCreate', async message => {
     }
 
     // ==========================================
-    //            CASINO LOGIC MODULES           
-    // ==========================================
-    
-    // CHAOTIC RECIPE GENERATOR
-    if (command === '!bananabread') {
-        const measurements = ['cups', 'tsp', 'tbsp', 'units', 'kilograms', 'drops'];
-        const generateChaoticMetrics = (ingredientLabel) => {
-            const numericalCoefficient = Math.floor(Math.random() * 100) + 1; 
-            const randomizedUnit = measurements[Math.floor(Math.random() * measurements.length)];
-            return `* 🍌 **${numericalCoefficient} ${randomizedUnit}** of ${ingredientLabel}`;
-        };
-
-        const embed = new EmbedBuilder()
-            .setColor('#FFE4C4')
-            .setTitle('🍌 Chaotic Banana Bread Formula')
-            .setDescription('Follow this formula exactly if you want to bake banana bread:')
-            .addFields(
-                {
-                    name: '📋 Ingredient Measurements Matrix',
-                    value: [
-                        generateChaoticMetrics('Matured Bananas'),
-                        generateChaoticMetrics('Melted Butter Fat'),
-                        generateChaoticMetrics('Baking Soda'),
-                        generateChaoticMetrics('Salt Crystals'),
-                        generateChaoticMetrics('Granulated Sugar'),
-                        generateChaoticMetrics('Beaten Egg'),
-                        generateChaoticMetrics('Vanilla Extract'),
-                        generateChaoticMetrics('All-Purpose Flour')
-                    ].join('\n')
-                }
-            )
-            .setFooter({ text: 'Baking Guidelines: Standard 180°C thermal environment settings.' })
-            .setTimestamp();
-
-        return message.channel.send({ embeds: [embed] });
-    }
-
-    if (command === '!8ball') {
-        const operationalInquiry = args.slice(1).join(' ');
-        if (!operationalInquiry) return message.reply('🎱 Please ask a specific question.');
-
-        const determinedIndexResult = customEightBallAnswers[Math.floor(Math.random() * customEightBallAnswers.length)];
-        return message.reply(`🎱 8-Ball Prediction: **${determinedIndexResult}**`);
-    }
-
-    if (command === '!rps') {
-        const handGestureInput = args[1]?.toLowerCase();
-        if (!['rock', 'paper', 'scissors'].includes(handGestureInput)) {
-            return message.reply('❌ Usage error. Valid parameters: `!rps rock/paper/scissors`');
-        }
-
-        const algorithmicPool = ['rock', 'paper', 'scissors'];
-        const virtualCompetitorPick = algorithmicPool[Math.floor(Math.random() * algorithmicPool.length)];
-
-        let calculationResultOutcome = 'You tied! Game drawn.';
-        if (
-            (handGestureInput === 'rock' && virtualCompetitorPick === 'scissors') ||
-            (handGestureInput === 'paper' && virtualCompetitorPick === 'rock') ||
-            (handGestureInput === 'scissors' && virtualCompetitorPick === 'paper')
-        ) { 
-            calculationResultOutcome = 'You won!'; 
-        } else if (handGestureInput !== virtualCompetitorPick) { 
-            calculationResultOutcome = 'You lost!'; 
-        }
-
-        return message.reply(`✊ You picked: **${handGestureInput}** | Bot picked: **${virtualCompetitorPick}**\n${calculationResultOutcome}`);
-    }
-
-    if (command === '!roll' || command === '!dice') {
-        const numericalBoundaryLimit = cleanAmount(args[1]) || 6;
-        return message.reply(`🎲 Dice roll resolved to value: **${Math.floor(Math.random() * numericalBoundaryLimit) + 1}**.`);
-    }
-
-    if (command === '!coin') {
-        return message.reply(`🪙 Coin flip result: **${Math.random() > 0.5 ? 'Heads' : 'Tails'}**`);
-    }
-
-    if (command === '!choose') {
-        const textOptionsInput = args.slice(1).join(' ');
-        if (!textOptionsInput.includes('|')) return message.reply('❌ Error: Split options with a vertical separator formatting token (e.g., `!choose option A | option B`)');
-
-        const arrayedCleanOptions = textOptionsInput.split('|').map(x => x.trim()).filter(Boolean);
-        return message.reply(`🔮 Arbitrator Choice: **${arrayedCleanOptions[Math.floor(Math.random() * arrayedCleanOptions.length)]}**`);
-    }
-
-    if (command === '!poll') {
-        const inquiryDescriptionText = args.slice(1).join(' ');
-        if (!inquiryDescriptionText) return message.reply('❌ Survey Error: Please type out a survey description string.');
-
-        const activePollMessageInstance = await message.channel.send(`📊 **Poll Questionnaire:** ${inquiryDescriptionText}\n✅ = Affirmative Approval\n❌ = Negative Dissent`);
-        await activePollMessageInstance.react('✅');
-        await activePollMessageInstance.react('❌');
-        return;
-    }
-
-    if (command === '!coinflip') {
-        const chosenBinaryState = args[1]?.toLowerCase();
-        const assetBetQuantity = cleanAmount(args[2]);
-
-        if (!['heads', 'tails'].includes(chosenBinaryState) || !assetBetQuantity || assetBetQuantity <= 0) {
-            return message.reply('❌ Argument Layout Error. Correct syntax: `!coinflip <heads/tails> <bet>`');
-        }
-
-        if (userData.coins < assetBetQuantity) return message.reply('❌ Transaction Canceled: You do not have enough coins.');
-
-        lastGambled[message.author.id] = Date.now();
-
-        const randomizedVectorOutput = Math.random() > 0.5 ? 'heads' : 'tails';
-
-        if (randomizedVectorOutput === chosenBinaryState) {
-            userData.coins += assetBetQuantity;
-            await userData.save();
-            return message.reply(`🪙 It landed on **${randomizedVectorOutput}**! You won! **+${assetBetQuantity} coins**.`);
-        }
-
-        userData.coins -= assetBetQuantity;
-        await userData.save();
-        message.reply(`🪙 It landed on **${randomizedVectorOutput}**. You lost! **-${assetBetQuantity} coins**.`);
-
-        if (assetBetQuantity >= 5000) {
-            try {
-                await message.author.send(`💀 **High-Risk Loss Notification:** You just lost **-${assetBetQuantity} coins** on a coinflip event inside **${message.guild.name}**.`);
-            } catch {}
-        }
-        return;
-    }
-
-    if (command === '!blackjack' || command === '!bj') {
-        const assetBetQuantity = cleanAmount(args[1]);
-        if (!assetBetQuantity || assetBetQuantity <= 0 || userData.coins < assetBetQuantity) return message.reply('❌ Accounting Error: Specified bet value parameter invalid.');
-
-        lastGambled[message.author.id] = Date.now();
-
-        const userScoreAllocation = Math.floor(Math.random() * 11) + 10;
-        const systemHouseScoreAllocation = Math.floor(Math.random() * 11) + 10;
-
-        if (userScoreAllocation > systemHouseScoreAllocation || systemHouseScoreAllocation > 21) {
-            userData.coins += assetBetQuantity;
-            await userData.save();
-            return message.reply(`🃏 Your score: **${userScoreAllocation}** | Dealer score: **${systemHouseScoreAllocation}**\n🎉 You won! **+${assetBetQuantity} coins**.`);
-        }
-
-        if (userScoreAllocation === systemHouseScoreAllocation) {
-            return message.reply(`🃏 Your score: **${userScoreAllocation}** | Dealer score: **${systemHouseScoreAllocation}**\n🤝 Game ended in a push.`);
-        }
-
-        userData.coins -= assetBetQuantity;
-        await userData.save();
-        message.reply(`🃏 Your score: **${userScoreAllocation}** | Dealer score: **${systemHouseScoreAllocation}**\n💀 You lost! **-${assetBetQuantity} coins**.`);
-
-        if (assetBetQuantity >= 5000) {
-            try {
-                await message.author.send(`🃏 **High-Risk Loss Notification:** Your recent blackjack hand failed, losing **-${assetBetQuantity} coins** to the house core in **${message.guild.name}**.`);
-            } catch {}
-        }
-        return;
-    }
-
-    if (command === '!gamble') {
-        const algorithmVariantMode = args[1]?.toLowerCase();
-        const assetBetQuantity = cleanAmount(args[2]);
-
-        if (!['slots', 'dice'].includes(algorithmVariantMode) || !assetBetQuantity || assetBetQuantity <= 0) {
-            return message.reply('❌ Parameter layout error. System formatting structure: `!gamble slots/dice <bet>`');
-        }
-
-        if (userData.coins < assetBetQuantity) return message.reply('❌ Transaction Canceled: You do not have enough coins.');
-
-        lastGambled[message.author.id] = Date.now();
-
-        if (algorithmVariantMode === 'slots') {
-            const visualMatrixTokens = ['🍒', '🍋', '🍇', '💎', '🔥'];
-            const compilationResultRow = [
-                visualMatrixTokens[Math.floor(Math.random() * visualMatrixTokens.length)],
-                visualMatrixTokens[Math.floor(Math.random() * visualMatrixTokens.length)],
-                visualMatrixTokens[Math.floor(Math.random() * visualMatrixTokens.length)]
-            ];
-
-            if (compilationResultRow[0] === compilationResultRow[1] && compilationResultRow[1] === compilationResultRow[2]) {
-                userData.coins += assetBetQuantity * 3;
-                await userData.save();
-                return message.reply(`🎰 Slot Display: [ ${compilationResultRow.join(' | ')} ]\n🔥 Jackpot hit! You won **+${assetBetQuantity * 3} coins**!`);
-            }
-
-            userData.coins -= assetBetQuantity;
-            await userData.save();
-            message.reply(`🎰 Slot Display: [ ${compilationResultRow.join(' | ')} ]\n💀 No matches. You lost! **-${assetBetQuantity} coins**.`);
-
-            if (assetBetQuantity >= 5000) {
-                try { await message.author.send(`🎰 **High-Risk Loss Notification:** Slot configuration tokens failed to match, losing **-${assetBetQuantity} coins** in **${message.guild.name}**.`); } catch {}
-            }
-            return;
-        }
-
-        const resolvedDiceInteger = Math.floor(Math.random() * 6) + 1;
-        if (resolvedDiceInteger >= 4) {
-            userData.coins += assetBetQuantity;
-            await userData.save();
-            return message.reply(`🎲 Dice rolled value: **${resolvedDiceInteger}**. You won! **+${assetBetQuantity} coins**.`);
-        }
-
-        userData.coins -= assetBetQuantity;
-        await userData.save();
-        message.reply(`🎲 Dice rolled value: **${resolvedDiceInteger}**. You lost! **-${assetBetQuantity} coins**.`);
-
-        if (assetBetQuantity >= 5000) {
-            try { await message.author.send(`🎲 **High-Risk Loss Notification:** Dice tracking calculations resulted in a loss of **-${assetBetQuantity} coins** in balance indicators.`); } catch {}
-        }
-        return;
-    }
-
-    if (command === '!rob') {
-        const targetIdentityReference = message.mentions.members.first();
-        if (!targetIdentityReference || targetIdentityReference.id === message.author.id) return message.reply('❌ Input Error: Specified target mention profile reference invalid.');
-
-        const timestampNow = Date.now();
-        if (lastRobbed[message.author.id] && timestampNow - lastRobbed[message.author.id] < 600000) {
-            return message.reply('❌ Cooldown Active: Robbery intercept matrix is charging.');
-        }
-
-        const targetedUserDataLog = await getUser(targetIdentityReference.id);
-        if (targetedUserDataLog.coins < 50) return message.reply('❌ Execution Error: Target profile ledger value falls beneath minimum baseline asset metrics.');
-
-        lastRobbed[message.author.id] = timestampNow;
-
-        if (targetedUserDataLog.hasShield) {
-            targetedUserDataLog.hasShield = false; 
-            userData.coins = Math.max(0, userData.coins - 100); 
-            targetedUserDataLog.coins += 100; 
-
-            await targetedUserDataLog.save();
-            await userData.save();
-
-            try { await targetIdentityReference.send(`🛡️ **Shield Intercept Notice:** Someone tried to run a \`!rob\` script on your wallet in **${message.guild.name}**! Your protection shield absorbed the breach, blocked all theft data, and counter-fined the attacker **+100 coins** directly to your pocket parameters.`); } catch {}
-            
-            return message.reply(`🚨 **Shield Blocked:** You tried to rob <@${targetIdentityReference.id}>, but they had an active **Theft Protection Shield**! Your tools broke and a network counter-fine of **-100 coins** was instantly debited to their wallet profile.`);
-        }
-
-        if (Math.random() < 0.35) {
-            const hijackedCapitalVolume = Math.min(targetedUserDataLog.coins, Math.floor(Math.random() * 100) + 25);
-            targetedUserDataLog.coins -= hijackedCapitalVolume;
-            userData.coins += hijackedCapitalVolume;
-            await targetedUserDataLog.save();
-            await userData.save();
-            return message.reply(`🥷 Success! You managed to sneak out and rob **+${hijackedCapitalVolume} coins** from their ledger profile.`);
-        }
-
-        userData.coins = Math.max(0, userData.coins - 30);
-        await userData.save();
-        return message.reply('🚨 Caught! You failed the robbery attempt and were fined **-30 coins** by local enforcement logs.');
-    }
-
-    // ==========================================
-    //           DISCIPLINARY MODERATION         
+    //            DISCIPLINARY MODERATION         
     // ==========================================
     if (command === '!clear' || command === '!purge') {
         if (!isStaff(message.member)) return message.reply('❌ Requires Trial Mod or superior privileges.');
@@ -1556,7 +1421,7 @@ client.on('messageCreate', async message => {
             embeds: [
                 new EmbedBuilder()
                     .setColor('#FFD700')
-                    .setTitle('📊 Centralized Server Account Account Asset Audit Ledger')
+                    .setTitle('📊 Centralized Server Account Asset Audit Ledger')
                     .setDescription(compiledAuditLines)
             ]
         });
