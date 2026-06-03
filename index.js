@@ -19,7 +19,7 @@ const MONGO_URI = process.env.MONGO_URI;
 const PORT = process.env.PORT || 3000;
 
 // DEVELOPER GATEWAY ROUTING ID
-const DEV_USER_ID = 'YOUR_DISCORD_USER_ID_HERE'; // <-- Nico, right-click your profile and paste your exact numeric ID string here!
+const DEV_USER_ID = '1314033520460693635'; // <-- Nico, right-click your profile and paste your exact numeric ID string here!
 
 // CHANNEL & ROLE CONTEXT CONFIGURATIONS
 const VIP_ROLE_ID = process.env.VIP_ROLE_ID || '1511458646348009573';
