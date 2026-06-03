@@ -1,6 +1,6 @@
 /**
  * @file index.js
- * @description FlameBot Core Engine — Version 1.8 (FlameCore Streamlined Build)
+ * @description FlameBot Core Engine — Version 1.8 (FlameCore Streamlined Build - Casino Restored)
  * @author Silas Benjamin Fawcett (Nico)
  */
 
@@ -76,7 +76,6 @@ const userSchema = new mongoose.Schema({
     hasBooster: { type: Boolean, default: false }, 
     customTitle: { type: String, default: null },   
     hasShield: { type: Boolean, default: false },
-    // Retained map structure so your future FlameStocks bot can link up to it natively
     portfolios: { type: Map, of: Number, default: {} } 
 });
 
@@ -346,7 +345,7 @@ client.on('messageCreate', async message => {
     // ==========================================
     //         ANTI-GAMBLESPAM INTERCEPTOR        
     // ==========================================
-    if (['!coinflip', '!blackjack', '!bj', '!gamble'].includes(command)) {
+    if (['!coinflip', '!blackjack', '!bj', '!gamble', '!rob'].includes(command)) {
         const timestampNow = Date.now();
         const userCasinoRecord = lastGambled[message.author.id];
 
@@ -376,7 +375,7 @@ client.on('messageCreate', async message => {
                 { name: '📣 Utilities', value: '`!links`, `!suggest`, `!afk`, `!say`, `!announce`' },
                 { name: '🛡️ Staff Only', value: '`!staffhelp`' }
             )
-            .setFooter({ text: 'FlameBot | Version 1.8 (Core Edition)' })
+            .setFooter({ text: 'FlameBot | Version 1.8 (Core Build)' })
             .setTimestamp();
 
         return message.channel.send({ embeds: [embed] });
@@ -505,26 +504,233 @@ client.on('messageCreate', async message => {
     }
 
     // ==========================================
+    //               🎰 CASINO SYSTEMS 🎰        
+    // ==========================================
+    
+    // COINFLIP
+    if (command === '!coinflip' || command === '!cf') {
+        const side = args[1]?.toLowerCase();
+        const bet = cleanAmount(args[2]);
+
+        if (!['heads', 'tails'].includes(side) || !bet || bet <= 0) {
+            return message.reply('❌ Usage: `!coinflip <heads/tails> <bet_amount>`');
+        }
+        if (userData.coins < bet) return message.reply('❌ You do not have enough coins.');
+
+        lastGambled[message.author.id] = Date.now();
+        const result = Math.random() < 0.5 ? 'heads' : 'tails';
+
+        if (side === result) {
+            userData.coins += bet;
+            await userData.save();
+            return message.reply(`🪙 The coin landed on **${result}**! You **WON** 🪙 **${bet}** coins!`);
+        } else {
+            userData.coins -= bet;
+            await userData.save();
+            return message.reply(`🪙 The coin landed on **${result}**! You **LOST** 🪙 **${bet}** coins.`);
+        }
+    }
+
+    // BLACKJACK
+    if (command === '!blackjack' || command === '!bj') {
+        const bet = cleanAmount(args[1]);
+        if (!bet || bet <= 0) return message.reply('❌ Usage: `!blackjack <bet_amount>`');
+        if (userData.coins < bet) return message.reply('❌ Insolvent balance.');
+
+        lastGambled[message.author.id] = Date.now();
+        
+        const playerVal = Math.floor(Math.random() * 10) + 12; // 12-21
+        const dealerVal = Math.floor(Math.random() * 10) + 12; // 12-21
+
+        if (playerVal > 21) {
+            userData.coins -= bet;
+            await userData.save();
+            return message.reply(`🃏 You drew **${playerVal}** and busted! House wins. Lost 🪙 **${bet}**.`);
+        }
+        if (dealerVal > 21 || playerVal > dealerVal) {
+            userData.coins += bet;
+            await userData.save();
+            return message.reply(`🃏 Your hand: **${playerVal}** | Dealer hand: **${dealerVal}**. You **WIN** 🪙 **${bet}** coins!`);
+        } else if (playerVal === dealerVal) {
+            return message.reply(`🃏 Push! Both you and the dealer got **${playerVal}**. Bet returned.`);
+        } else {
+            userData.coins -= bet;
+            await userData.save();
+            return message.reply(`🃏 Your hand: **${playerVal}** | Dealer hand: **${dealerVal}**. House wins. Lost 🪙 **${bet}**.`);
+        }
+    }
+
+    // SLOTS / DICE GAMBLE MODULE
+    if (command === '!gamble') {
+        const mode = args[1]?.toLowerCase();
+        const bet = cleanAmount(args[2]);
+
+        if (!['slots', 'dice'].includes(mode) || !bet || bet <= 0) {
+            return message.reply('❌ Usage: `!gamble <slots/dice> <bet_amount>`');
+        }
+        if (userData.coins < bet) return message.reply('❌ Insolvent balance lines.');
+
+        lastGambled[message.author.id] = Date.now();
+
+        if (mode === 'dice') {
+            const userRoll = Math.floor(Math.random() * 6) + 1;
+            const botRoll = Math.floor(Math.random() * 6) + 1;
+
+            if (userRoll > botRoll) {
+                userData.coins += bet;
+                await userData.save();
+                return message.reply(`🎲 You rolled a **${userRoll}**! FlameBot rolled a **${botRoll}**. You **WIN** 🪙 **${bet}** coins!`);
+            } else if (userRoll === botRoll) {
+                return message.reply(`🎲 Draw! Both rolled a **${userRoll}**. Stash saved.`);
+            } else {
+                userData.coins -= bet;
+                await userData.save();
+                return message.reply(`🎲 You rolled a **${userRoll}**! FlameBot rolled a **${botRoll}**. You **LOST** 🪙 **${bet}** coins.`);
+            }
+        }
+
+        if (mode === 'slots') {
+            const symbols = ['🍒', '🍋', '🍇', '💎', '🔥'];
+            const s1 = symbols[Math.floor(Math.random() * symbols.length)];
+            const s2 = symbols[Math.floor(Math.random() * symbols.length)];
+            const s3 = symbols[Math.floor(Math.random() * symbols.length)];
+
+            const visual = `[ ${s1} | ${s2} | ${s3} ]`;
+
+            if (s1 === s2 && s2 === s3) {
+                const payout = bet * 4;
+                userData.coins += payout;
+                await userData.save();
+                return message.reply(`🎰 ${visual} JACKPOT! Triple matching line! You won 🪙 **+${payout}** coins!`);
+            } else if (s1 === s2 || s2 === s3 || s1 === s3) {
+                const payout = Math.floor(bet * 1.5);
+                userData.coins += payout;
+                await userData.save();
+                return message.reply(`🎰 ${visual} Mid Double Match! You won 🪙 **+${payout}** coins.`);
+            } else {
+                userData.coins -= bet;
+                await userData.save();
+                return message.reply(`🎰 ${visual} No matches. You lost 🪙 **-${bet}** coins.`);
+            }
+        }
+    }
+
+    // ROB / ROBBERY SYSTEM
+    if (command === '!rob') {
+        const target = message.mentions.members.first();
+        if (!target) return message.reply('❌ Usage: `!rob @user`');
+        if (target.id === message.author.id) return message.reply('❌ You cannot rob yourself, bro.');
+
+        const targetData = await getUser(target.id);
+        if (targetData.coins < 200) return message.reply('❌ Leave them alone, they are down bad right now (less than 200 coins).');
+        if (userData.coins < 100) return message.reply('❌ You need at least 100 coins in your pocket to attempt a heist.');
+
+        lastGambled[message.author.id] = Date.now(); // Applies global casino speed trap filter
+
+        // SHIELD PROTECTION INTERCEPTOR BLOCK
+        if (targetData.hasShield) {
+            targetData.hasShield = false; // Breach shield layer variables
+            
+            const penaltyFine = Math.min(userData.coins, 250);
+            userData.coins -= penaltyFine;
+            targetData.coins += penaltyFine;
+
+            await userData.save();
+            await targetData.save();
+
+            return message.reply(`🛡️ **COUNTERED!** ${target.user.username} had a active **Theft Protection Shield** active! You failed the operation, got fined, and paid them 🪙 **${penaltyFine} coins** as restitution.`);
+        }
+
+        const successChance = Math.random() < 0.45; // 45% chance rate efficiency
+
+        if (successChance) {
+            const stealPercentage = (Math.random() * 0.25) + 0.10; // Steal between 10% - 35%
+            const hijackedCapital = Math.floor(targetData.coins * stealPercentage);
+
+            targetData.coins -= hijackedCapital;
+            userData.coins += hijackedCapital;
+
+            await userData.save();
+            await targetData.save();
+
+            return message.reply(`🥷 **HEIST SUCCESSFUL:** You successfully pickpocketed ${target} and ran off with 🪙 **+${hijackedCapital} coins**!`);
+        } else {
+            const penaltyFine = Math.floor(userData.coins * 0.15) || 50; // Dropped 15% wallet capacities
+            userData.coins = Math.max(0, userData.coins - penaltyFine);
+            await userData.save();
+
+            return message.reply(`🚨 **HEIST FAILED:** You tripped the alarms trying to bypass security lines and dropped 🪙 **-${penaltyFine} coins** running from mod cops.`);
+        }
+    }
+
+    // ==========================================
+    //         FUN / CASUAL COMMAND MODULES       
+    // ==========================================
+    if (command === '!8ball') {
+        const phrase = args.slice(1).join(' ');
+        if (!phrase) return message.reply('❌ Ask me a question first.');
+        const out = customEightBallAnswers[Math.floor(Math.random() * customEightBallAnswers.length)];
+        return message.reply(`🔮 **8-Ball Response:** ${out}`);
+    }
+
+    if (command === '!rps') {
+        const choice = args[1]?.toLowerCase();
+        if (!['rock', 'paper', 'scissors'].includes(choice)) return message.reply('❌ Pick `rock`, `paper`, or `scissors`.');
+        const options = ['rock', 'paper', 'scissors'];
+        const enginePick = options[Math.floor(Math.random() * options.length)];
+        if (choice === enginePick) return message.reply(`👔 Push! Both picked **${choice}**.`);
+        if ((choice === 'rock' && enginePick === 'scissors') || (choice === 'paper' && enginePick === 'rock') || (choice === 'scissors' && enginePick === 'paper')) {
+            return message.reply(`🎉 Winner! Your **${choice}** breaks FlameBot's **${enginePick}**.`);
+        } else {
+            return message.reply(`❌ L! FlameBot's **${enginePick}** smashes your **${choice}**.`);
+        }
+    }
+
+    if (command === '!roll') {
+        const bound = cleanAmount(args[1]) || 100;
+        return message.reply(`🎲 Random Outcome: You rolled a **${Math.floor(Math.random() * bound) + 1}** inside max frame limits (1-${bound}).`);
+    }
+
+    if (command === '!choose') {
+        const inputs = args.slice(1).join(' ').split('|').map(x => x.trim()).filter(Boolean);
+        if (inputs.length < 2) return message.reply('❌ Give me multiple elements separated with a pipe `|`.');
+        return message.reply(`🤔 Choice Picker: I select *"${inputs[Math.floor(Math.random() * inputs.length)]}"*.`);
+    }
+
+    if (command === '!coin') {
+        return message.reply(`🪙 Flip Result: **${Math.random() < 0.5 ? 'HEADS' : 'TAILS'}**.`);
+    }
+
+    if (command === '!dice') {
+        return message.reply(`🎲 Dice Face: Landed on value **${Math.floor(Math.random() * 6) + 1}**.`);
+    }
+
+    if (command === '!poll') {
+        const title = args.slice(1).join(' ');
+        if (!title) return message.reply('❌ Usage: `!poll <Your question here>`');
+        const embed = new EmbedBuilder().setColor('#FF8C00').setTitle('📊 Global Server Poll').setDescription(title).setFooter({ text: `Opened by ${message.author.username}` });
+        const m = await message.channel.send({ embeds: [embed] });
+        await m.react('👍'); await m.react('👎');
+        return;
+    }
+
+    if (command === '!bananabread') {
+        return message.reply('🍌🍞 **Banana Bread Recipe Matrix:**\n*Mix 3 ripe bananas, 1/3 cup melted butter, 1 tsp baking soda, 1 cup sugar, 1 beaten egg, 1.5 cups flour. Bake at 175°C (350°F) for exactly 1 hour inside deep bread tin models.*');
+    }
+
+    // ==========================================
     //         LOGGING TOGGLE COMMANDS            
     // ==========================================
     if (command === '!enablelogs') {
         if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
-        
-        if (systemLogsEnabled) {
-            return message.reply('Notice: Server logs are already enabled.');
-        }
-
+        if (systemLogsEnabled) return message.reply('Notice: Server logs are already enabled.');
         systemLogsEnabled = true;
         return message.reply('✅ **Logs Enabled:** Staff DM log alerts are now active.');
     }
 
     if (command === '!disablelogs') {
         if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
-        
-        if (!systemLogsEnabled) {
-            return message.reply('Notice: Server logs are already disabled.');
-        }
-
+        if (!systemLogsEnabled) return message.reply('Notice: Server logs are already disabled.');
         systemLogsEnabled = false;
         return message.reply('⚠️ **Logs Disabled:** Staff DM log alerts have been turned off.');
     }
@@ -1263,7 +1469,7 @@ client.on('messageCreate', async message => {
             embeds: [
                 new EmbedBuilder()
                     .setColor('#FFD700')
-                    .setTitle('📊 Centralized Server Account Asset Audit Ledger')
+                    .setTitle(' Centralized Server Account Asset Audit Ledger')
                     .setDescription(compiledAuditLines)
             ]
         });
