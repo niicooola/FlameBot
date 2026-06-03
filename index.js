@@ -179,19 +179,41 @@ client.on('messageCreate', async message => {
         const newLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
 
         // Level Up Alert Channel Lock Routing
+      // Level Up Alert & Role Rewards
         if (newLevel > oldLevel) {
             const coinPrize = 100 + (newLevel * 50);
             userData.coins += coinPrize;
 
             const levelChannel = message.guild.channels.cache.get(LEVEL_CHANNEL_ID);
+            
+            // Text template for the milestone announcement
+            let levelMessage = `🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevel}**!! Payout: 🪙 **+${coinPrize}** Flame Coins.`;
+
+            // 👑 SENIOR MEMBER AUTOROLE SYSTEM (Requires Level 10 / 5,000 messages)
+            const SR_MEMBER_ROLE_ID = 'YOUR_SR_MEMBER_ROLE_ID_HERE'; // Replace with your actual role ID string
+            if (newLevel >= 10 && !message.member.roles.cache.has(SR_MEMBER_ROLE_ID)) {
+                const srRole = message.guild.roles.cache.get(SR_MEMBER_ROLE_ID);
+                if (srRole) {
+                    try {
+                        await message.member.roles.add(srRole);
+                        levelMessage += `\n🏅 **PROMOTION!** You have earned the **${srRole.name}** role for reaching the Level 10 grind milestone!`;
+                        
+                        // Slide a clean congratulatory notice straight into their DMs
+                        await message.author.send(`🏅 **Congratulations, bro!** You officially unlocked the **Senior Member** role in **${message.guild.name}**! Thanks for keeping the chat active and grinding with the community, gng!`).catch(() => {});
+                    } catch (err) {
+                        console.error('Failed to add Senior Member role (Check hierarchy):', err);
+                    }
+                }
+            }
+
+             await userData.save();
+            
             if (levelChannel) {
-                levelChannel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevel}**!! Payout: 🪙 **+${coinPrize}** Flame Coins.`);
+                levelChannel.send(levelMessage);
             } else {
-                message.channel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevel}**!! Payout: 🪙 **+${coinPrize}** Flame Coins.`);
+                message.channel.send(levelMessage);
             }
         }
-
-        await userData.save();
 
         // Smart Talking Logic via Groq Check Matrix
         if (message.content.trim().split(/\s+/).length >= 3) {
@@ -260,10 +282,27 @@ client.on('messageCreate', async message => {
         userData.coins += coinPrizeCmd;
 
         const levelChannelCmd = message.guild.channels.cache.get(LEVEL_CHANNEL_ID);
+        let cmdLevelMessage = `🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevelCmd}**!! Payout: 🪙 **+${coinPrizeCmd}** Flame Coins.`;
+
+        // 👑 SENIOR MEMBER AUTOROLE SYSTEM FOR COMMAND CHECKS
+        const SR_MEMBER_ROLE_ID = 'YOUR_SR_MEMBER_ROLE_ID_HERE'; // Replace with your actual role ID string
+        if (newLevelCmd >= 10 && !message.member.roles.cache.has(SR_MEMBER_ROLE_ID)) {
+            const srRole = message.guild.roles.cache.get(SR_MEMBER_ROLE_ID);
+            if (srRole) {
+                try {
+                    await message.member.roles.add(srRole);
+                    cmdLevelMessage += `\n🏅 **PROMOTION!** You have earned the **${srRole.name}** role for reaching the Level 10 grind milestone!`;
+                    await message.author.send(`🏅 **Congratulations, bro!** You officially unlocked the **Senior Member** role in **${message.guild.name}**! Thanks for keeping the chat active and grinding with the community, gng!`).catch(() => {});
+                } catch (err) {
+                    console.error('Failed to add Senior Member role via command check:', err);
+                }
+            }
+        }
+
         if (levelChannelCmd) {
-            levelChannelCmd.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevelCmd}**!! Payout: 🪙 **+${coinPrizeCmd}** Flame Coins.`);
+            levelChannelCmd.send(cmdLevelMessage);
         } else {
-            message.channel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevelCmd}**!! Payout: 🪙 **+${coinPrizeCmd}** Flame Coins.`);
+            message.channel.send(cmdLevelMessage);
         }
     }
 
