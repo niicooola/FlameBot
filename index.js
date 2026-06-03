@@ -37,9 +37,6 @@ const client = new Client({
     ]
 });
 
-// GEMINI
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-
 // DATABASE
 const userSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
@@ -60,7 +57,13 @@ const lastRobbed = {};
 // HELPERS
 async function getUser(id) {
     let user = await User.findOne({ id });
-    if (!user) user = await User.create({ id });
+    if (!user) {
+        try {
+            user = await User.create({ id });
+        } catch (err) {
+            user = await User.findOne({ id });
+        }
+    }
     return user;
 }
 
@@ -127,17 +130,36 @@ client.on('guildMemberAdd', async member => {
 // MESSAGE HANDLER
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
+
+    const userData = await getUser(message.author.id);
+
+    // --- NEW: AFK RETURN CHECKER ---
+    if (userData.afk) {
+        userData.afk = null;
+        await userData.save();
+        message.reply('👋 Welcome back! I have removed your AFK status.').then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+    }
+
+    // --- NEW: AFK MENTION CHECKER ---
+    if (message.mentions.members.size > 0) {
+        message.mentions.members.forEach(async (member) => {
+            const mentionedData = await User.findOne({ id: member.id });
+            if (mentionedData && mentionedData.afk) {
+                message.reply(`💤 **${member.user.username}** is currently AFK: ${mentionedData.afk}`);
+            }
+        });
+    }
+
+    // PASSIVE INCOME SYSTEM
     if (!message.content.startsWith(PREFIX)) {
-        const passiveUser = await getUser(message.author.id);
-        passiveUser.coins += CHAT_INCOME;
-        passiveUser.xp += 2;
-        await passiveUser.save();
+        userData.coins += CHAT_INCOME;
+        userData.xp += 2;
+        await userData.save();
         return;
     }
 
     const args = message.content.trim().split(/\s+/);
     const command = args[0].toLowerCase();
-    const userData = await getUser(message.author.id);
 
     userData.coins += CHAT_INCOME;
     userData.xp += 5;
@@ -150,34 +172,13 @@ client.on('messageCreate', async message => {
             .setTitle('🔥 FlameBot Command Hub')
             .setDescription('Yo bro, here are the commands.')
             .addFields(
-                {
-                    name: '🤖 AI',
-                    value: '`!ask <question>`'
-                },
-                {
-                    name: '🪙 Economy',
-                    value: '`!bal`, `!daily`, `!work`, `!pay @user <amount>`, `!leaderboard`, `!shop`, `!buy vip`, `!rank`'
-                },
-                {
-                    name: '🎰 Casino',
-                    value: '`!blackjack <bet>`, `!coinflip <heads/tails> <bet>`, `!gamble slots/dice <bet>`, `!rob @user`'
-                },
-                {
-                    name: '🎉 Fun',
-                    value: '`!8ball`, `!rps`, `!roll`, `!choose`, `!coin`, `!dice`, `!poll`'
-                },
-                {
-                    name: '📊 Info',
-                    value: '`!stats`, `!serverinfo`, `!whois`, `!avatar`, `!ping`, `!uptime`, `!botinfo`, `!membercount`, `!channelinfo`'
-                },
-                {
-                    name: '📣 Utility',
-                    value: '`!links`, `!suggest`, `!afk`, `!say`, `!announce`'
-                },
-                {
-                    name: '🛡️ Staff',
-                    value: '`!staffhelp`'
-                }
+                { name: '🤖 AI', value: '`!ask <question>`' },
+                { name: '🪙 Economy', value: '`!bal`, `!daily`, `!work`, `!pay @user <amount>`, `!leaderboard`, `!shop`, `!buy vip`, `!rank`' },
+                { name: '🎰 Casino', value: '`!blackjack <bet>`, `!coinflip <heads/tails> <bet>`, `!gamble slots/dice <bet>`, `!rob @user`' },
+                { name: '🎉 Fun', value: '`!8ball`, `!rps`, `!roll`, `!choose`, `!coin`, `!dice`, `!poll`' },
+                { name: '📊 Info', value: '`!stats`, `!serverinfo`, `!whois`, `!avatar`, `!ping`, `!uptime`, `!botinfo`, `!membercount`, `!channelinfo`' },
+                { name: '📣 Utility', value: '`!links`, `!suggest`, `!afk`, `!say`, `!announce`' },
+                { name: '🛡️ Staff', value: '`!staffhelp`' }
             )
             .setFooter({ text: 'FlameBot Render Edition' })
             .setTimestamp();
@@ -192,24 +193,14 @@ client.on('messageCreate', async message => {
             .setColor('#2F3136')
             .setTitle('🛡️ Staff Command Hub')
             .addFields(
-                {
-                    name: '⚠️ Moderation',
-                    value: '`!warn @user`, `!warnings @user`, `!clearwarns @user`, `!mute @user`, `!unmute @user`, `!tempmute @user <mins>`, `!kick @user`, `!ban @user`'
-                },
-                {
-                    name: '🧹 Channel Control',
-                    value: '`!clear <1-100>`, `!slowmode <seconds/off>`, `!lockchannel`, `!unlockchannel`'
-                },
-                {
-                    name: '💰 Economy Admin',
-                    value: '`!addcoins @user <amount>`, `!removecoins @user <amount>`, `!setcoins @user <amount>`, `!resetcoins @user`, `!baltable`'
-                }
+                { name: '⚠️ Moderation', value: '`!warn @user`, `!warnings @user`, `!clearwarns @user`, `!mute @user`, `!unmute @user`, `!tempmute @user <mins>`, `!kick @user`, `!ban @user`' },
+                { name: '🧹 Channel Control', value: '`!clear <1-100>`, `!slowmode <seconds/off>`, `!lockchannel`, `!unlockchannel`' },
+                { name: '💰 Economy Admin', value: '`!addcoins @user <amount>`, `!removecoins @user <amount>`, `!setcoins @user <amount>`, `!resetcoins @user`, `!baltable`' }
             );
 
         return message.channel.send({ embeds: [embed] });
     }
 
-    // AI
     // AI COMMAND POWERED BY GROQ
     if (command === '!ask') {
         const question = args.slice(1).join(' ');
@@ -225,7 +216,7 @@ client.on('messageCreate', async message => {
                     },
                     { role: 'user', content: question }
                 ],
-                model: 'llama3-8b-8192', // Blazing fast model with a massive free tier allocation
+                model: 'llama3-8b-8192',
                 temperature: 0.7,
                 max_tokens: 500
             });
