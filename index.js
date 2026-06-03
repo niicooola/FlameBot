@@ -8,11 +8,11 @@ const {
     PermissionsBitField,
     EmbedBuilder
 } = require('discord.js');
-const { GoogleGenAI } = require('@google/genai');
+const Groq = require('groq-sdk');
 
 // ENV
 const TOKEN = process.env.DISCORD_TOKEN;
-const GEMINI_API_KEY = process.env.GEMINI_KEY;
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const MONGO_URI = process.env.MONGO_URI;
 const PORT = process.env.PORT || 3000;
 
@@ -210,25 +210,31 @@ client.on('messageCreate', async message => {
     }
 
     // AI
+    // AI COMMAND POWERED BY GROQ
     if (command === '!ask') {
         const question = args.slice(1).join(' ');
         if (!question) return message.reply('❌ Usage: `!ask <question>`');
 
         const loading = await message.reply('🧠 Thinking...');
         try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: question,
-                config: {
-                    systemInstruction:
-                        'You are FlameBot, a Discord bot. Be helpful, concise, and friendly.'
-                }
+            const chatCompletion = await groq.chat.completions.create({
+                messages: [
+                    { 
+                        role: 'system', 
+                        content: 'You are FlameBot, the official high-energy AI core for streamer RedFlame. Be helpful, concise, and match the community vibe using slang like gng, cooked, bro, and wsp. Links: Twitch: https://twitch.tv/redflamingarrow_ YouTube: https://www.youtube.com/@redflamingarrowlive.' 
+                    },
+                    { role: 'user', content: question }
+                ],
+                model: 'llama3-8b-8192', // Blazing fast model with a massive free tier allocation
+                temperature: 0.7,
+                max_tokens: 500
             });
 
-            return loading.edit(response.text.substring(0, 1999));
+            const replyText = chatCompletion.choices[0]?.message?.content || '⚠️ No response generated.';
+            return loading.edit(replyText.substring(0, 1999));
         } catch (err) {
-            console.error(err);
-            return loading.edit('⚠️ AI failed.');
+            console.error('Groq AI Engine Error:', err);
+            return loading.edit('⚠️ AI core failed to generate a response.');
         }
     }
 
