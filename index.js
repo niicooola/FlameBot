@@ -23,7 +23,16 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_KEY });
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.guild) return;
 
-    let user = await User.findOne({ id: message.author.id }) || await User.create({ id: message.author.id });
+    // --- NEW INDESTRUCTIBLE LOGIC ---
+let user = await User.findOne({ id: message.author.id });
+if (!user) {
+    try {
+        user = await User.create({ id: message.author.id });
+    } catch (err) {
+        // If it still errors, it means the user was created exactly in the split second before this
+        user = await User.findOne({ id: message.author.id });
+    }
+}
     user.coins += 5;
     await user.save();
 
@@ -94,4 +103,6 @@ client.on('messageCreate', async (message) => {
     else if (cmd === '!golive' && isStaff) message.reply('Stream announced!');
 });
 
+const http = require('http');
+http.createServer((req, res) => res.end('FlameBot is online!')).listen(process.env.PORT || 3000);
 client.login(process.env.DISCORD_TOKEN);
