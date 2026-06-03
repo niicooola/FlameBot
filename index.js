@@ -1,8 +1,7 @@
 /**
  * @file index.js
- * @description FlameBot Core Infrastructure Engine — Version 1.1
+ * @description FlameBot Core Engine — Version 1.2
  * @author Silas Benjamin Fawcett (Nico)
- * @license Proprietary / Confidential
  */
 
 require('dotenv').config();
@@ -26,20 +25,23 @@ const PORT = process.env.PORT || 3000;
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// TARGET DIRECTORIES & DISCORD IDENTIFIERS
+// DISCORD IDENTIFIERS
 const DEV_USER_ID = '1314033520460693635';
 const LEVEL_CHANNEL_ID = '1511569329949380668';
 const VIP_ROLE_ID = process.env.VIP_ROLE_ID || '1511458646348009573';
 const MUTE_ROLE_ID = process.env.MUTE_ROLE_ID || '1509040670801789019';
 const STREAM_PING_ROLE_ID = process.env.STREAM_PING_ROLE_ID || '1503627239713935452';
-const SR_MEMBER_ROLE_ID = 'YOUR_SR_MEMBER_ROLE_ID_HERE'; // Assign when definitive ID is acquired
+const SR_MEMBER_ROLE_ID = 'YOUR_SR_MEMBER_ROLE_ID_HERE'; 
 
-// ECONOMIC MATRIX PARAMS
+// SYSTEM STATE MATRIX
+let systemLogsEnabled = true; 
+
+// ECONOMY PARAMS
 const PREFIX = '!';
 const VIP_PRICE = 10000;
 const CHAT_INCOME = 5;
 
-// CLIENT INSTANTIATION MATRIX
+// CLIENT INTENTS
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -66,12 +68,12 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// STATIC RESOURCE ARRAYS
+// 8BALL POOL
 const customEightBallAnswers = [
     'Yes.', 'No.', 'Probably.', 'Definitely.', 'Outlook grim.', 'Ask again later.', 'Absolutely not.', 'Looks good.'
 ];
 
-// COOL DOWN REGISTRIES
+// COOLDOWNS
 const lastWorked = {};
 const lastDaily = {};
 const lastGambled = {};
@@ -120,6 +122,8 @@ function cleanAmount(value) {
 }
 
 async function dmServerLeadership(guild, embed) {
+    if (!systemLogsEnabled) return;
+
     try {
         const members = await guild.members.fetch();
         const management = members.filter(m => 
@@ -132,7 +136,7 @@ async function dmServerLeadership(guild, embed) {
             }
         });
     } catch (err) {
-        console.error('Leadership DM pipeline failed:', err);
+        console.error('Failed to send log to staff:', err);
     }
 }
 
@@ -141,30 +145,30 @@ async function dmServerLeadership(guild, embed) {
 // ==========================================
 if (MONGO_URI) {
     mongoose.connect(MONGO_URI)
-        .then(() => console.log('💾 Database Link Verified: MongoDB instance connected.'))
-        .catch(err => console.error('❌ Database Link Failure:', err));
+        .then(() => console.log('💾 MongoDB connected.'))
+        .catch(err => console.error('❌ MongoDB error:', err));
 } else {
-    console.warn('⚠️ Environment Alert: MONGO_URI missing.');
+    console.warn('⚠️ Warning: MONGO_URI missing from environment variables.');
 }
 
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('FlameBot Web Server Status: Operational');
+    res.end('FlameBot is online');
 }).listen(PORT, () => {
-    console.log(`🌐 Server hosting operational on Port ${PORT}`);
+    console.log(`🌐 Web server running on port ${PORT}`);
 });
 
 client.once('ready', () => {
-    console.log(`🔥 Integration Successful: Logged into Discord API as ${client.user.tag}`);
+    console.log(`🔥 FlameBot logged in as ${client.user.tag}`);
 });
 
 client.on('guildMemberAdd', async member => {
     try {
         await member.send(
-            `Welcome to **${member.guild.name}**.\nPlease use the command \`${PREFIX}help\` within the server to view available commands.`
+            `Welcome to **${member.guild.name}**!\nType \`${PREFIX}help\` in the server to see what I can do.`
         );
     } catch {
-        console.log(`Communication Exception: Unable to send direct message to ${member.user.tag}`);
+        console.log(`Could not send welcome DM to ${member.user.tag}`);
     }
 });
 
@@ -176,23 +180,23 @@ client.on('messageCreate', async message => {
 
     const userData = await getUser(message.author.id);
 
-    // --- AFK STATUS MANAGEMENT ---
+    // --- AFK STATUS ---
     if (userData.afk) {
         userData.afk = null;
         await userData.save();
-        message.reply('Status Update: Welcome back. Your AFK status has been revoked.').then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
+        message.reply('Welcome back! I removed your AFK status.').then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
     }
 
     if (message.mentions.members.size > 0) {
         message.mentions.members.forEach(async (member) => {
             const mentionedData = await User.findOne({ id: member.id });
             if (mentionedData && mentionedData.afk) {
-                message.reply(`Notice: **${member.user.username}** is currently AFK: ${mentionedData.afk}`);
+                message.reply(`${member.user.username} is currently AFK: ${mentionedData.afk}`);
             }
         });
     }
 
-    // --- PASSIVE REVENUE & INTERACTIVE AI PARSING ---
+    // --- PASSIVE REVENUE & AI CHAT ---
     if (!message.content.startsWith(PREFIX)) {
         const oldLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
         const actualIncome = userData.hasBooster ? (CHAT_INCOME * 2) : CHAT_INCOME;
@@ -207,15 +211,15 @@ client.on('messageCreate', async message => {
             userData.coins += coinPrize;
 
             const levelChannel = message.guild.channels.cache.get(LEVEL_CHANNEL_ID);
-            let levelMessage = `🎉 **Level Up!** <@${message.author.id}> has progressed to **Level ${newLevel}**. Granting a payout of 🪙 **+${coinPrize}** Flame Coins.`;
+            let levelMessage = `🎉 **Level Up!** <@${message.author.id}> reached **Level ${newLevel}**! Here is a bonus of 🪙 **+${coinPrize}** coins.`;
 
             if (newLevel >= 10 && !message.member.roles.cache.has(SR_MEMBER_ROLE_ID)) {
                 const srRole = message.guild.roles.cache.get(SR_MEMBER_ROLE_ID);
                 if (srRole) {
                     try {
                         await message.member.roles.add(srRole);
-                        levelMessage += `\n🏅 **Promotion!** You have been assigned the **${srRole.name}** role for reaching the Level 10 milestone.`;
-                        await message.author.send(`🏅 **Achievement Unlocked:** You have earned the **Senior Member** role in **${message.guild.name}** for maintaining active engagement.`).catch(() => {});
+                        levelMessage += `\n🏅 You earned the **${srRole.name}** role for reaching Level 10!`;
+                        await message.author.send(`🏅 **Role Unlocked:** You earned the **Senior Member** role in **${message.guild.name}** for staying active!`).catch(() => {});
                     } catch {}
                 }
             }
@@ -229,14 +233,14 @@ client.on('messageCreate', async message => {
 
         await userData.save();
 
-        // CONVERSATION TRACE MATRIX (Groq Analytics Check)
+        // GROQ AI INTERACTION CHANCE
         if (message.content.trim().split(/\s+/).length >= 3) {
             try {
                 const filterCompletion = await groq.chat.completions.create({
                     messages: [
                         {
                             role: 'system',
-                            content: 'You are an advanced text analytics filter. Evaluate the input message. If the message contains inquiries, requests for documentation, analytical statements, or academic interest topics (e.g., Minecraft mechanics, systems, programming), return explicitly "TRIGGER". If the statement consists only of greetings, short casual interjections, or general conversational filler, return "IGNORE". Do not provide auxiliary remarks.'
+                            content: 'You are a message filter for a Discord bot. Look at the user message. If it is a question, hot take, or an interesting gaming/coding topic (like Minecraft or programming), reply with exactly "TRIGGER". If it is just general greeting, basic hype, or short casual chat, reply with exactly "IGNORE". Do not add any extra text.'
                         },
                         { role: 'user', content: message.content }
                     ],
@@ -248,19 +252,19 @@ client.on('messageCreate', async message => {
                 const decision = filterCompletion.choices[0]?.message?.content?.trim().toUpperCase();
 
                 if (decision.includes('TRIGGER')) {
-                    const PASS_THRESHOLD_PERCENT = 30;
-                    const evaluationRoll = Math.floor(Math.random() * 100) + 1;
+                    const CHANCE_PERCENT = 30;
+                    const roll = Math.floor(Math.random() * 100) + 1;
 
-                    if (evaluationRoll <= PASS_THRESHOLD_PERCENT) {
+                    if (roll <= CHANCE_PERCENT) {
                         await message.channel.sendTyping();
 
                         const replyCompletion = await groq.chat.completions.create({
                             messages: [
                                 {
                                     role: 'system',
-                                    content: 'You are FlameBot, an advanced AI core configured for the RedFlame interactive environment. Respond articulately, intelligently, and concisely to the discussion. Maintain an engaging, direct persona. Limit your response to a maximum of two sentences.'
+                                    content: 'You are FlameBot, a helpful and casual AI for the RedFlame Discord server. Reply naturally and casually to the user. Keep it very short, maximum 1 or 2 sentences. Sound friendly and normal, not overly corporate or overly formal.'
                                 },
-                                { role: 'user', content: `Contextual conversation text input: "${message.content}". Generate a corresponding response.` }
+                                { role: 'user', content: `Someone just said this in chat: "${message.content}". Drop a quick reply.` }
                             ],
                             model: 'llama-3.1-8b-instant',
                             temperature: 0.7,
@@ -274,13 +278,13 @@ client.on('messageCreate', async message => {
                     }
                 }
             } catch (err) {
-                console.error('Groq Text Engine Exception Logged:', err);
+                console.error('Groq Chat Error:', err);
             }
         }
         return; 
     }
 
-    // --- COMMAND EXECUTION ENGINE ---
+    // --- COMMAND PARSING ---
     const args = message.content.trim().split(/\s+/);
     const command = args[0].toLowerCase();
 
@@ -297,15 +301,15 @@ client.on('messageCreate', async message => {
         userData.coins += coinPrizeCmd;
 
         const levelChannelCmd = message.guild.channels.cache.get(LEVEL_CHANNEL_ID);
-        let cmdLevelMessage = `🎉 **Level Up!** <@${message.author.id}> has progressed to **Level ${newLevelCmd}**. Granting a payout of 🪙 **+${coinPrizeCmd}** Flame Coins.`;
+        let cmdLevelMessage = `🎉 **Level Up!** <@${message.author.id}> reached **Level ${newLevelCmd}**! Here is a bonus of 🪙 **+${coinPrizeCmd}** coins.`;
 
         if (newLevelCmd >= 10 && !message.member.roles.cache.has(SR_MEMBER_ROLE_ID)) {
             const srRole = message.guild.roles.cache.get(SR_MEMBER_ROLE_ID);
             if (srRole) {
                 try {
                     await message.member.roles.add(srRole);
-                    cmdLevelMessage += `\n🏅 **Promotion!** You have been assigned the **${srRole.name}** role for reaching the Level 10 milestone.`;
-                    await message.author.send(`🏅 **Achievement Unlocked:** You have earned the **Senior Member** role in **${message.guild.name}** for maintaining active engagement.`).catch(() => {});
+                    cmdLevelMessage += `\n🏅 You earned the **${srRole.name}** role for reaching Level 10!`;
+                    await message.author.send(`🏅 **Role Unlocked:** You earned the **Senior Member** role in **${message.guild.name}** for staying active!`).catch(() => {});
                 } catch {}
             }
         }
@@ -323,45 +327,69 @@ client.on('messageCreate', async message => {
     //               SYSTEM MODULES               
     // ==========================================
 
-    // DOCUMENTATION / HELP INTERFACE
+    // HELP MENU
     if (command === '!help') {
         const embed = new EmbedBuilder()
             .setColor('#FF4500')
-            .setTitle('🔥 FlameBot Directory Interface')
-            .setDescription('Comprehensive index of available system modules:')
+            .setTitle('🔥 FlameBot Commands')
+            .setDescription('Here is a list of all available commands:')
             .addFields(
-                { name: '🤖 Artificial Intelligence', value: '`!ask <query>`' },
-                { name: '🪙 Fiscal Economy', value: '`!bal`, `!daily`, `!work`, `!pay @user <amount>`, `!leaderboard`, `!shop`, `!buy <item>`, `!rank`' },
-                { name: '🎰 Casino Operations', value: '`!blackjack <bet>`, `!coinflip <heads/tails> <bet>`, `!gamble slots/dice <bet>`, `!rob @user`' },
-                { name: '🎉 Entertainment', value: '`!8ball`, `!rps`, `!roll`, `!choose`, `!coin`, `!dice`, `!poll`, `!bananabread`' },
-                { name: '📊 Analytics & Metrics', value: '`!stats`, `!serverinfo`, `!whois`, `!avatar`, `!ping`, `!uptime`, `!botinfo`, `!membercount`, `!channelinfo`' },
+                { name: '🤖 AI Chat', value: '`!ask <question>`' },
+                { name: '🪙 Economy', value: '`!bal`, `!daily`, `!work`, `!pay @user <amount>`, `!leaderboard`, `!shop`, `!buy <item>`, `!rank`' },
+                { name: '🎰 Casino', value: '`!blackjack <bet>`, `!coinflip <heads/tails> <bet>`, `!gamble slots/dice <bet>`, `!rob @user`' },
+                { name: '🎉 Fun', value: '`!8ball`, `!rps`, `!roll`, `!choose`, `!coin`, `!dice`, `!poll`, `!bananabread`' },
+                { name: '📊 Info & Stats', value: '`!stats`, `!serverinfo`, `!whois`, `!avatar`, `!ping`, `!uptime`, `!botinfo`, `!membercount`, `!channelinfo`' },
                 { name: '📣 Utilities', value: '`!links`, `!suggest`, `!afk`, `!say`, `!announce`' },
-                { name: '🛡️ Administrative Staff', value: '`!staffhelp`' }
+                { name: '🛡️ Staff Only', value: '`!staffhelp`' }
             )
-            .setFooter({ text: 'FlameBot Engine Build v1.1 | Production Environment' })
+            .setFooter({ text: 'FlameBot | Version 1.2' })
             .setTimestamp();
 
         return message.channel.send({ embeds: [embed] });
     }
 
     if (command === '!staffhelp') {
-        if (!isStaff(message.member)) return message.reply('❌ Authorization Failure: Restricted to server staff directories.');
+        if (!isStaff(message.member)) return message.reply('❌ You do not have permission to use staff commands.');
 
         const embed = new EmbedBuilder()
             .setColor('#2F3136')
-            .setTitle('🛡️ Operations Command Registry')
+            .setTitle('🛡️ Staff Command Directory')
             .addFields(
-                { name: '⚠️ Moderation Controls', value: '`!warn @user <reason>`, `!warnings @user`, `!clearwarns @user`, `!mute @user`, `!unmute @user`, `!tempmute @user <mins>`, `!kick @user [time] [reason]`, `!ban @user [time] [reason]`' },
-                { name: '🧹 Channel Maintenance', value: '`!clear <1-100>`, `!slowmode <seconds/off>`, `!lockchannel`, `!unlockchannel`' },
-                { name: '💰 Ledger Administration', value: '`!addcoins @user <amount>`, `!removecoins @user <amount>`, `!setcoins @user <amount>`, `!resetcoins @user`, `!baltable`, `!approvesuggest <userId>`, `!rejectsuggest <userId> <reason>`' }
+                { name: '⚠️ Moderation', value: '`!warn @user <reason>`, `!warnings @user`, `!clearwarns @user`, `!mute @user`, `!unmute @user`, `!tempmute @user <mins>`, `!kick @user [time] [reason]`, `!ban @user [time] [reason]`' },
+                { name: '🧹 Channel Controls', value: '`!clear <1-100>`, `!slowmode <seconds/off>`, `!lockchannel`, `!unlockchannel`' },
+                { name: '💰 Economy Admin', value: '`!addcoins @user <amount>`, `!removecoins @user <amount>`, `!setcoins @user <amount>`, `!resetcoins @user`, `!baltable`, `!approvesuggest <userId>`, `!rejectsuggest <userId> <reason>`' },
+                { name: '⚙️ Logging Controls', value: '`!enablelogs`, `!disablelogs`' }
             );
 
         return message.channel.send({ embeds: [embed] });
     }
 
-    // ARCHIVAL SNAPSHOT EXPORT
+    // LOGGING TOGGLE COMMANDS
+    if (command === '!enablelogs') {
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
+        
+        if (systemLogsEnabled) {
+            return message.reply('Notice: Server logs are already enabled.');
+        }
+
+        systemLogsEnabled = true;
+        return message.reply('✅ **Logs Enabled:** Staff DM log alerts are now active.');
+    }
+
+    if (command === '!disablelogs') {
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
+        
+        if (!systemLogsEnabled) {
+            return message.reply('Notice: Server logs are already disabled.');
+        }
+
+        systemLogsEnabled = false;
+        return message.reply('⚠️ **Logs Disabled:** Staff DM log alerts have been turned off.');
+    }
+
+    // BACKUP EXPOT
     if (command === '!backupjson') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
 
         try {
             const users = await User.find().sort({ coins: -1 });
@@ -369,26 +397,26 @@ client.on('messageCreate', async message => {
             const jsonBuffer = Buffer.from(JSON.stringify(backupData, null, 4), 'utf-8');
 
             return message.channel.send({
-                content: '📥 **System Log: BALANCES.JSON archival snapshot generated successfully.** High-fidelity storage documents maintained.',
+                content: '📥 Here is the current database backup file:',
                 files: [{ attachment: jsonBuffer, name: 'BALANCES.JSON' }]
             });
         } catch (err) {
-            return message.reply('❌ Archival Error: Internal compiler failure encountered.');
+            return message.reply('❌ Failed to create the backup file.');
         }
     }
 
-    // ARTIFICIAL INTELLIGENCE QUERY MODULE
+    // AI COMMAND
     if (command === '!ask') {
         const query = args.slice(1).join(' ');
-        if (!query) return message.reply('❌ Argument Error: Correct syntax: `!ask <query>`');
+        if (!query) return message.reply('❌ Please provide a question. Usage: `!ask <question>`');
 
-        const processingAlert = await message.reply('🧠 Initializing neural node parameters...');
+        const processingAlert = await message.reply('🧠 Thinking...');
         try {
             const chatCompletion = await groq.chat.completions.create({
                 messages: [
                     { 
                         role: 'system', 
-                        content: 'You are FlameBot, the definitive high-performance AI entity configured for the RedFlame content environment. Provide articulate, accurate, and structured information. Information Links: Twitch: https://twitch.tv/redflamingarrow_ YouTube: https://www.youtube.com/@redflamingarrowlive.' 
+                        content: 'You are FlameBot, a helpful and casual AI companion for the RedFlame Discord community. Answer naturally and directly. Keep it normal and friendly. Twitch: https://twitch.tv/redflamingarrow_ YouTube: https://www.youtube.com/@redflamingarrowlive.' 
                     },
                     { role: 'user', content: query }
                 ],
@@ -397,24 +425,24 @@ client.on('messageCreate', async message => {
                 max_tokens: 500
             });
 
-            const replyText = chatCompletion.choices[0]?.message?.content || '⚠️ Analytics Alert: Failed to return token payloads.';
+            const replyText = chatCompletion.choices[0]?.message?.content || '⚠️ Error: No response generated.';
             return processingAlert.edit(replyText.substring(0, 1999));
         } catch (err) {
-            console.error('Groq Runtime Node Exception:', err);
-            return processingAlert.edit('⚠️ Processing Exception: Core module returned an execution failure.');
+            console.error('AI Command Error:', err);
+            return processingAlert.edit('⚠️ Sorry, I ran into an error processing that question.');
         }
     }
 
-    // LATENCY & RUNTIME PERFORMANCE METRICS
+    // STATS & INFRASTRUCTURE COMMANDS
     if (command === '!ping') {
-        return message.reply(`🏓 API Network Latency: \`${Date.now() - message.createdTimestamp}ms\``);
+        return message.reply(`🏓 Pong! Latency is \`${Date.now() - message.createdTimestamp}ms\`.`);
     }
 
     if (command === '!uptime') {
         const totalSeconds = Math.floor(process.uptime());
         const runtimeHours = Math.floor(totalSeconds / 3600);
         const runtimeMinutes = Math.floor((totalSeconds % 3600) / 60);
-        return message.reply(`⏱️ Engine Runtime Statistics: **${runtimeHours}h ${runtimeMinutes}m**`);
+        return message.reply(`⏱️ Bot Uptime: **${runtimeHours}h ${runtimeMinutes}m**`);
     }
 
     if (command === '!botinfo') {
@@ -422,11 +450,11 @@ client.on('messageCreate', async message => {
             embeds: [
                 new EmbedBuilder()
                     .setColor('#FF4500')
-                    .setTitle('🤖 System Engine Properties')
+                    .setTitle('🤖 Bot Information')
                     .addFields(
-                        { name: 'Active Guild Handlers', value: `${client.guilds.cache.size}`, inline: true },
-                        { name: 'Cached Identities', value: `${client.users.cache.size}`, inline: true },
-                        { name: 'Infrastructure Layer', value: 'Node.js + Discord.js + MongoDB + Render Stack' }
+                        { name: 'Servers', value: `${client.guilds.cache.size}`, inline: true },
+                        { name: 'Cached Users', value: `${client.users.cache.size}`, inline: true },
+                        { name: 'Platform Stack', value: 'Node.js + Discord.js + MongoDB' }
                     )
             ]
         });
@@ -437,18 +465,18 @@ client.on('messageCreate', async message => {
             embeds: [
                 new EmbedBuilder()
                     .setColor('#32CD32')
-                    .setTitle(`🏰 Guild Registry: ${message.guild.name}`)
+                    .setTitle(`🏰 ${message.guild.name}`)
                     .addFields(
-                        { name: '👥 Verified Population', value: `${message.guild.memberCount}`, inline: true },
-                        { name: '📈 Guild Premium Tier Boosts', value: `${message.guild.premiumSubscriptionCount || 0}`, inline: true },
-                        { name: '🆔 Core Guild ID', value: message.guild.id }
+                        { name: 'Members', value: `${message.guild.memberCount}`, inline: true },
+                        { name: 'Server Boosts', value: `${message.guild.premiumSubscriptionCount || 0}`, inline: true },
+                        { name: 'Server ID', value: message.guild.id }
                     )
             ]
         });
     }
 
     if (command === '!membercount') {
-        return message.reply(`👥 Current Population Metrics: **${message.guild.memberCount} users**`);
+        return message.reply(`👥 Total Members: **${message.guild.memberCount}**`);
     }
 
     if (command === '!whois' || command === '!userinfo') {
@@ -457,12 +485,12 @@ client.on('messageCreate', async message => {
             embeds: [
                 new EmbedBuilder()
                     .setColor('#9B59B6')
-                    .setTitle(`🔍 Identity Index: ${target.user.username}`)
+                    .setTitle(`🔍 User Info: ${target.user.username}`)
                     .setThumbnail(target.user.displayAvatarURL({ size: 1024 }))
                     .addFields(
-                        { name: 'Account Instantiation Date', value: `<t:${Math.floor(target.user.createdTimestamp / 1000)}:F>` },
-                        { name: 'Guild Enrollment Date', value: `<t:${Math.floor(target.joinedTimestamp / 1000)}:F>` },
-                        { name: 'Identifier String (ID)', value: target.id }
+                        { name: 'Account Created', value: `<t:${Math.floor(target.user.createdTimestamp / 1000)}:F>` },
+                        { name: 'Joined Server', value: `<t:${Math.floor(target.joinedTimestamp / 1000)}:F>` },
+                        { name: 'User ID', value: target.id }
                     )
             ]
         });
@@ -474,7 +502,7 @@ client.on('messageCreate', async message => {
             embeds: [
                 new EmbedBuilder()
                     .setColor('#1E90FF')
-                    .setTitle(`🖼️ Asset Vector: ${target.user.username}'s Avatar`)
+                    .setTitle(`🖼️ ${target.user.username}'s Avatar`)
                     .setImage(target.user.displayAvatarURL({ size: 1024 }))
             ]
         });
@@ -482,7 +510,7 @@ client.on('messageCreate', async message => {
 
     if (command === '!channelinfo') {
         return message.reply(
-            `📺 Channel Label: **${message.channel.name}**\n🆔 Registry Identifier: \`${message.channel.id}\``
+            `📺 Channel: **${message.channel.name}**\n🆔 Channel ID: \`${message.channel.id}\``
         );
     }
 
@@ -491,25 +519,25 @@ client.on('messageCreate', async message => {
             embeds: [
                 new EmbedBuilder()
                     .setColor('#FF4500')
-                    .setTitle('🔥 Content Platform Directories')
+                    .setTitle('🔥 Community Links')
                     .setDescription(
-                        '🎥 YouTube Network: https://www.youtube.com/@redflamingarrowliven🔮 Twitch Broadcast Hub: https://twitch.tv/redflamingarrow_'
+                        '🎥 YouTube Channel: https://www.youtube.com/@redflamingarrowliven🔮 Twitch Live: https://twitch.tv/redflamingarrow_'
                     )
             ]
         });
     }
 
-    // COIN ECONOMY LEDGER INTERFACE
+    // ECONOMY COMMANDS
     if (command === '!bal' || command === '!balance') {
         const target = message.mentions.members.first();
 
         if (target) {
-            if (!isStaff(message.member)) return message.reply('❌ Authorization Failure: Restricted to server staff hierarchies.');
+            if (!isStaff(message.member)) return message.reply('❌ Staff only.');
             const targetData = await getUser(target.id);
-            return message.reply(`🔍 Accounts Ledger: **${target.user.username}** possesses 🪙 **${targetData.coins}** Flame Coins.`);
+            return message.reply(`🔍 **${target.user.username}** has 🪙 **${targetData.coins}** coins.`);
         }
 
-        return message.reply(`🪙 Financial Statement: Your liquidity equals **${userData.coins} Flame Coins**.`);
+        return message.reply(`🪙 Balance Statement: You have **${userData.coins} coins**.`);
     }
 
     if (command === '!stats') {
@@ -521,14 +549,14 @@ client.on('messageCreate', async message => {
             embeds: [
                 new EmbedBuilder()
                     .setColor('#1E90FF')
-                    .setTitle(`👤 Profile Index Summary: ${target.user.username} ${data.customTitle ? data.customTitle : ''}`) 
+                    .setTitle(`👤 Profile Summary: ${target.user.username} ${data.customTitle ? data.customTitle : ''}`) 
                     .addFields(
-                        { name: '🪙 Fluid Coin Reserves', value: `${data.coins}`, inline: true },
-                        { name: '⭐ Cumulative Experience (XP)', value: `${data.xp}`, inline: true },
-                        { name: '📈 Structural Level', value: `${level}`, inline: true },
-                        { name: '🛡️ Active Defensive Shield', value: data.hasShield ? '✅ Implemented' : '❌ Inactive', inline: true },
-                        { name: '💸 Income Multiplier Status', value: data.hasBooster ? '✅ 2.0x Multiplier Deployed' : '❌ Standard Rate (1.0x)', inline: true },
-                        { name: '⚠️ Disciplinary Infractions', value: `${data.warnings}/3 Warnings Logged`, inline: true }
+                        { name: '🪙 Coins', value: `${data.coins}`, inline: true },
+                        { name: '⭐ XP', value: `${data.xp}`, inline: true },
+                        { name: '📈 Level', value: `${level}`, inline: true },
+                        { name: '🛡️ Active Shield', value: data.hasShield ? '✅ Yes' : '❌ No', inline: true },
+                        { name: '💸 Coin Booster', value: data.hasBooster ? '✅ 2.0x Multiplier Active' : '❌ None', inline: true },
+                        { name: '⚠️ Warnings Logged', value: `${data.warnings}/3 Warnings`, inline: true }
                     )
             ]
         });
@@ -539,25 +567,25 @@ client.on('messageCreate', async message => {
         const nextLevelXp = Math.pow((level + 1) / 0.1, 2);
         const xpNeeded = Math.ceil(nextLevelXp - userData.xp);
 
-        return message.reply(`📈 Progress Matrix: ${userData.customTitle ? `${userData.customTitle} ` : ''}Level **${level}** | Accumulated XP: **${userData.xp}** (Requirements: **${xpNeeded}** remaining XP until advancement)`);
+        return message.reply(`📈 Rank Info: ${userData.customTitle ? `${userData.customTitle} ` : ''}Level **${level}** | XP: **${userData.xp}** (You need **${xpNeeded}** more XP to level up!)`);
     }
 
     if (command === '!daily') {
         const timestampNow = Date.now();
         if (lastDaily[message.author.id] && timestampNow - lastDaily[message.author.id] < 86400000) {
-            return message.reply('❌ Scheduling Lockout: Your daily allocation is locked. Please check back when your 24-hour cycle completes.');
+            return message.reply('❌ You already claimed your daily coins today. Check back tomorrow!');
         }
 
         userData.coins += 100;
         lastDaily[message.author.id] = timestampNow;
         await userData.save();
 
-        message.reply('📆 Asset Allocation: 🪙 **+100 Flame Coins** has been successfully authorized to your ledger balance.');
+        message.reply('📆 Daily Reward Claimed! 🪙 **+100 coins** added to your balance.');
 
         setTimeout(async () => {
             const resolvedUserObj = await client.users.fetch(message.author.id).catch(() => null);
             if (resolvedUserObj) {
-                await resolvedUserObj.send('📆 **Notification:** Your daily allocation cool-down matrix has concluded. Use `!daily` to authorize assets.').catch(() => {});
+                await resolvedUserObj.send('📆 **Daily Reset Notice:** Your daily reward timer is clear. Run `!daily` to grab your next batch of coins!').catch(() => {});
             }
         }, 86400000);
         return;
@@ -566,7 +594,7 @@ client.on('messageCreate', async message => {
     if (command === '!work') {
         const timestampNow = Date.now();
         if (lastWorked[message.author.id] && timestampNow - lastWorked[message.author.id] < 3600000) {
-            return message.reply('❌ Operations Lockout: Work cool-down in progress. Rest computational cycles before next execution.');
+            return message.reply('❌ Work is on cooldown. Take a break before trying to work again.');
         }
 
         const standardWage = Math.floor(Math.random() * 101) + 50;
@@ -574,12 +602,12 @@ client.on('messageCreate', async message => {
         lastWorked[message.author.id] = timestampNow;
         await userData.save();
 
-        message.reply(`💼 Task Finalized: Labour completed successfully. Remittance authorized: 🪙 **${standardWage} Flame Coins**.`);
+        message.reply(`💼 Shift finished! You worked and earned 🪙 **+${standardWage} coins**.`);
 
         setTimeout(async () => {
             const resolvedUserObj = await client.users.fetch(message.author.id).catch(() => null);
             if (resolvedUserObj) {
-                await resolvedUserObj.send('💼 **Notification:** Labor pipelines are clear. You are cleared to re-execute the `!work` command matrix.').catch(() => {});
+                await resolvedUserObj.send('💼 **Work Notice:** Your work cooldown has expired. You are clear to run `!work` again.').catch(() => {});
             }
         }, 3600000);
         return;
@@ -589,9 +617,9 @@ client.on('messageCreate', async message => {
         const target = message.mentions.members.first();
         const amount = cleanAmount(args[2]);
 
-        if (!target || !amount || amount <= 0) return message.reply('❌ Validation Error: Correct syntax: `!pay @user <amount>`');
-        if (target.id === message.author.id) return message.reply('❌ Transaction Exception: Self-transfers cannot be processed.');
-        if (userData.coins < amount) return message.reply('❌ Insolvency Alert: Insufficient funds to validate balance transfer.');
+        if (!target || !amount || amount <= 0) return message.reply('❌ Invalid format. Usage: `!pay @user <amount>`');
+        if (target.id === message.author.id) return message.reply('❌ Transaction Error: You cannot pay yourself.');
+        if (userData.coins < amount) return message.reply('❌ You do not have enough coins to complete this transfer.');
 
         const targetData = await getUser(target.id);
         userData.coins -= amount;
@@ -600,38 +628,38 @@ client.on('messageCreate', async message => {
         await userData.save();
         await targetData.save();
 
-        return message.reply(`💸 Remittance Confirmed: Dispatched 🪙 **${amount}** Flame Coins directly to **${target.user.username}**.`);
+        return message.reply(`💸 Transfer Confirmed: Sent 🪙 **${amount}** coins to **${target.user.username}**.`);
     }
 
     if (command === '!leaderboard' || command === '!lb') {
         const highNetWorthRecords = await User.find().sort({ coins: -1 }).limit(10);
-        const classificationLines = highNetWorthRecords.map((u, i) => `**Rank #${i + 1}** <@${u.id}> — Ledger Value: 🪙 ${u.coins}`).join('\n') || 'No records compiled.';
+        const classificationLines = highNetWorthRecords.map((u, i) => `**#${i + 1}** <@${u.id}> — Balance: 🪙 ${u.coins}`).join('\n') || 'No coin data logged.';
 
         return message.channel.send({
             embeds: [
                 new EmbedBuilder()
                     .setColor('#FFD700')
-                    .setTitle('🏆 High-Net-Worth Asset Leaderboard')
+                    .setTitle('🏆 Top Balances Leaderboard')
                     .setDescription(classificationLines)
             ]
         });
     }
 
-    // PREMIUM ITEM PROCUREMENT MARKETPLACE
+    // COIN MARKETPLACE SHOP
     if (command === '!shop') {
         return message.channel.send({
             embeds: [
                 new EmbedBuilder()
                     .setColor('#00FFAA')
-                    .setTitle('🏪 FlameBot Commercial Token Marketplace')
-                    .setDescription('Allocate your structural balance assets to acquire identity modifications and active parameter shielding:')
+                    .setTitle('🏪 FlameBot Token Shop')
+                    .setDescription('Spend your coins to unlock profile enhancements and protections:')
                     .addFields(
-                        { name: '💎 VIP Authorization Status (`!buy vip`)', value: `Valuation: 🪙 **${VIP_PRICE}**\nAuthorizes full access to guild VIP designated channels.` },
-                        { name: '💸 2x Multiplier Core Booster (`!buy booster`)', value: 'Valuation: 🪙 **5,000**\nPermanently configures all message and command coin yields to double volume.' },
-                        { name: '🎨 Custom Hex Chroma Role (`!buy color <hex>`)', value: 'Valuation: 🪙 **15,000**\nCreates and instantiates a premium personalized color layer (e.g., `!buy color #FF4500`).' },
-                        { name: '🔮 Predictive Pool Injected Parameter (`!buy 8ball <text>`)', value: 'Valuation: 🪙 **8,000**\nPermanently appends your custom string entry to the system oracle response database.' },
-                        { name: '🎭 Vanity Identity Profile Title (`!buy title <text>`)', value: 'Valuation: 🪙 **12,000**\nAppends a permanent prefix character tag onto your statistics panel.' },
-                        { name: '🛡️ Cryptographic Robbery Shielding (`!buy shield`)', value: 'Valuation: 🪙 **3,500**\nDeploys a single-use invisible counter-measure. Prevents theft data frames and triggers cross-fines.' }
+                        { name: '💎 VIP Access Status (`!buy vip`)', value: `Price: 🪙 **${VIP_PRICE}**\nGrants exclusive access to server VIP channels.` },
+                        { name: '💸 2x Passive Income Booster (`!buy booster`)', value: 'Price: 🪙 **5,000**\nPermanently doubles all coins earned from typing messages and running commands.' },
+                        { name: '🎨 Custom Color Role (`!buy color <hex>`)', value: 'Price: 🪙 **15,000**\nCreates your own personal colored role (e.g., `!buy color #FF4500`).' },
+                        { name: '🔮 Custom 8-Ball Option (`!buy 8ball <text>`)', value: 'Price: 🪙 **8,000**\nPermanently adds your custom text response into the global `!8ball` response pool.' },
+                        { name: '🎭 Custom Profile Title (`!buy title <text>`)', value: 'Price: 🪙 **12,000**\nAppends a customized title tag onto your profile card metrics.' },
+                        { name: '🛡️ Theft Protection Shield (`!buy shield`)', value: 'Price: 🪙 **3,500**\nDeploys a one-time invisible defense matrix. Blocks the next `!rob` attempt and fines the thief.' }
                     )
             ]
         });
@@ -639,178 +667,178 @@ client.on('messageCreate', async message => {
 
     if (command === '!buy') {
         const productKey = args[1]?.toLowerCase();
-        if (!productKey) return message.reply('❌ Parameter Error: Correct execution syntax: `!buy <item_name> [arguments]`');
+        if (!productKey) return message.reply('❌ Missing item label. Usage: `!buy <item_name> [parameters]`');
 
         if (productKey === 'vip') {
-            if (userData.coins < VIP_PRICE) return message.reply('❌ Financial Exception: Balance insufficient to meet token price valuations.');
+            if (userData.coins < VIP_PRICE) return message.reply('❌ Purchase Error: You do not have enough coins.');
             const targetRole = message.guild.roles.cache.get(VIP_ROLE_ID);
-            if (!targetRole) return message.reply('❌ Integration Error: Server role reference identifier misconfigured.');
+            if (!targetRole) return message.reply('❌ System Error: VIP role mapping missing from configurations.');
             try {
                 await message.member.roles.add(targetRole);
                 userData.coins -= VIP_PRICE;
                 await userData.save();
-                return message.reply('🎉 **Transaction Complete:** Premium VIP authorization vectors configured on your identity.');
+                return message.reply('🎉 **Purchase Successful:** You unlocked the premium VIP role status.');
             } catch {
-                return message.reply('❌ Permissions Exception: Failed to alter user profile hierarchy.');
+                return message.reply('❌ Permissions Error: Failed to append role to your identity card.');
             }
         }
 
         if (productKey === 'booster') {
-            if (userData.hasBooster) return message.reply('❌ Integrity Exception: Your profile is already operating under an active revenue multiplier core.');
-            if (userData.coins < 5000) return message.reply('❌ Financial Exception: Resource requirement error. Cost: 🪙 **5,000 coins**.');
+            if (userData.hasBooster) return message.reply('❌ Upgrade Error: You already have an active passive multiplier booster.');
+            if (userData.coins < 5000) return message.reply('❌ Purchase Error: You need 🪙 **5,000 coins** to purchase a booster.');
 
             userData.hasBooster = true;
             userData.coins -= 5000;
             await userData.save();
-            return message.reply('💸 **Hardware Upgrade Confirmed:** Income multiplier core permanently set to 2.0x efficiency. 🚀');
+            return message.reply('💸 **Booster Purchased:** You are now earning double coins across message channels permanently.');
         }
 
         if (productKey === 'color') {
             const hexCodeInput = args[2];
-            if (!hexCodeInput || !/^#[0-9A-F]{6}$/i.test(hexCodeInput)) return message.reply('❌ Syntax Validation Error: Correct format: `!buy color <#HEXCODE>` (e.g., `!buy color #FF4500`)');
-            if (userData.coins < 15000) return message.reply('❌ Financial Exception: Resource requirement error. Cost: 🪙 **15,000 coins**.');
+            if (!hexCodeInput || !/^#[0-9A-F]{6}$/i.test(hexCodeInput)) return message.reply('❌ Format Error: Correct usage format: `!buy color <#HEXCODE>` (e.g., `!buy color #FF4500`)');
+            if (userData.coins < 15000) return message.reply('❌ Purchase Error: You need 🪙 **15,000 coins** to change your name color.');
 
             try {
                 userData.coins -= 15000;
                 await userData.save();
 
                 const newlyMintedRole = await message.guild.roles.create({
-                    name: `🎨 Tint Vector: ${message.author.username}`,
+                    name: `🎨 Color: ${message.author.username}`,
                     color: hexCodeInput,
-                    reason: 'Automated procurement via premium shop interface execution.'
+                    reason: 'Premium shop color acquisition.'
                 });
 
                 await message.member.roles.add(newlyMintedRole);
-                return message.reply(`🎨 **Asset Generation Complete:** Instantiated and attached your personalized chroma layer matching hex code **${hexCodeInput}**.`);
+                return message.reply(`🎨 **Color Created:** Generated and attached your custom tint matching hex code **${hexCodeInput}**.`);
             } catch (err) {
                 console.error(err);
-                return message.reply('❌ API Exception Encountered: Internal role matrix initialization failure.');
+                return message.reply('❌ API Error: Internal role creation processing failed.');
             }
         }
 
         if (productKey === '8ball') {
             const userStringInjection = args.slice(2).join(' ');
-            if (!userStringInjection || userStringInjection.length < 3) return message.reply('❌ Argument Error: Correct parameter syntax: `!buy 8ball <Your custom oracle statement>`');
-            if (userData.coins < 8000) return message.reply('❌ Financial Exception: Resource requirement error. Cost: 🪙 **8,000 coins**.');
+            if (!userStringInjection || userStringInjection.length < 3) return message.reply('❌ Argument Error: Correct parameter layout: `!buy 8ball <Your custom answer here>`');
+            if (userData.coins < 8000) return message.reply('❌ Purchase Error: You need 🪙 **8,000 coins** to add an answer.');
 
             customEightBallAnswers.push(userStringInjection);
             userData.coins -= 8000;
             await userData.save();
-            return message.reply(`🔮 **Database Record Alteration:** Your custom string entry *"${userStringInjection}"* has been safely recorded to local script arrays.`);
+            return message.reply(`🔮 **Database Injected:** Your custom phrase *"${userStringInjection}"* has been added to the 8-ball array.`);
         }
 
         if (productKey === 'title') {
             const alphanumericTitle = args.slice(2).join(' ');
-            if (!alphanumericTitle || alphanumericTitle.length > 20) return message.reply('❌ Constraint Validation Error: Title string lengths must not exceed 20 characters.');
-            if (userData.coins < 12000) return message.reply('❌ Financial Exception: Resource requirement error. Cost: 🪙 **12,000 coins**.');
+            if (!alphanumericTitle || alphanumericTitle.length > 20) return message.reply('❌ Constraint Error: Custom profile titles cannot exceed 20 characters.');
+            if (userData.coins < 12000) return message.reply('❌ Purchase Error: You need 🪙 **12,000 coins** to change your title.');
 
             userData.customTitle = `[${alphanumericTitle}]`;
             userData.coins -= 12000;
             await userData.save();
-            return message.reply(`🎭 **Identity Tag Assigned:** Vanity profile string set to **[${alphanumericTitle}]**. Check visibility using \`!stats\`.`);
+            return message.reply(`🎭 **Profile Title Fixed:** Your profile title is now set to **[${alphanumericTitle}]**. View it using \`!stats\`.`);
         }
 
         if (productKey === 'shield') {
-            if (userData.hasShield) return message.reply('❌ System Status Alert: Active defensive shielding matrix already online.');
-            if (userData.coins < 3500) return message.reply('❌ Financial Exception: Resource requirement error. Cost: 🪙 **3,500 coins**.');
+            if (userData.hasShield) return message.reply('❌ Upgrade Error: You already have a defensive shield deployed.');
+            if (userData.coins < 3500) return message.reply('❌ Purchase Error: You need 🪙 **3,500 coins** to purchase a robbery shield.');
 
             userData.hasShield = true;
             userData.coins -= 3500;
             await userData.save();
-            return message.reply('🛡️ **Defensive Counter-Measure Initialized:** A secure data barrier is now active. The next transaction intercept vector initiated via `!rob` will be blocked.');
+            return message.reply('🛡️ **Shield Deployed:** Your account balance is now protected from the next robbery attempt.');
         }
 
-        return message.reply('❌ System Directory Index Error: Catalog item key unresolved. Please cross-reference item indexes via `!shop`.');
+        return message.reply('❌ Item indexing error: That product does not exist. Use `!shop` to view available catalog inventory items.');
     }
 
-    // DEVELOPER-ROUTE SUGGESTION INBOX PORTAL
+    // PROPOSALS PIPELINE
     if (command === '!suggest') {
         const suggestionContent = args.slice(1).join(' ');
-        if (!suggestionContent) return message.reply('❌ Argument Validation Error: Correct syntax: `!suggest <content_proposal_string>`');
+        if (!suggestionContent) return message.reply('❌ Argument Error: Please specify your suggestion idea. Usage: `!suggest <idea>`');
 
         try {
             const developmentLeadIdentity = await client.users.fetch(DEV_USER_ID);
             if (developmentLeadIdentity) {
                 const suggestionTransmissionEmbed = new EmbedBuilder()
                     .setColor('#00FFFF')
-                    .setTitle('🎟️ Remote Infrastructure Modification Proposal')
+                    .setTitle('🎟️ New Feature Modification Proposal')
                     .addFields(
-                        { name: 'Originating Submitter', value: `<@${message.author.id}> (ID: \`${message.author.id}\`)`, inline: true },
-                        { name: 'Channel Reference Vector', value: `<#${message.channel.id}>`, inline: true },
-                        { name: 'Proposed Specifications', value: suggestionContent }
+                        { name: 'Author Profile', value: `<@${message.author.id}> (ID: \`${message.author.id}\`)`, inline: true },
+                        { name: 'Source Channel', value: `<#${message.channel.id}>`, inline: true },
+                        { name: 'Specifications', value: suggestionContent }
                     )
-                    .setFooter({ text: 'FlameBot Remote Management Pipeline Port' })
+                    .setFooter({ text: 'FlameBot Pipeline Monitor' })
                     .setTimestamp();
 
                 await developmentLeadIdentity.send({ embeds: [suggestionTransmissionEmbed] });
             }
         } catch (err) {
-            console.error('Data Transfer Exception: Transmission to development desk terminated:', err);
+            console.error('Data transfer pipe crash:', err);
         }
 
-        return message.reply('✅ **Data Transmission Operational:** Your feature proposal packet has been securely dispatched to the Lead Developer\'s diagnostic registry for evaluation.');
+        return message.reply('✅ **Proposal Logged:** Your suggestion packet was successfully routed to the Lead Developer inbox.');
     }
 
     if (command === '!approvesuggest') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
         const targetedUserStringId = args[1];
-        if (!targetedUserStringId) return message.reply('❌ Argument Error: Usage: `!approvesuggest <userId>`');
+        if (!targetedUserStringId) return message.reply('❌ Usage: `!approvesuggest <userId>`');
 
         const resolvedTargetUser = await client.users.fetch(targetedUserStringId).catch(() => null);
         if (resolvedTargetUser) {
-            await resolvedTargetUser.send(`🎟️ **Proposal Status Notification:** An administrative audit has officially approved your feature suggestion submission within **${message.guild.name}**. We appreciate your technical insight.`).catch(() => {});
-            return message.reply('✅ Automation Update: Targeted user dispatched notification of proposal authorization.');
+            await resolvedTargetUser.send(`🎟️ **Proposal Approved:** An administrator reviewed and officially approved your suggestion inside **${message.guild.name}**! Thanks for your input.`).catch(() => {});
+            return message.reply('✅ The user has been notified of their proposal approval.');
         }
-        return message.reply('❌ Lookup Failure: Unable to securely reach corresponding user objects.');
+        return message.reply('❌ Lookup Failure: Could not locate that user profile ID.');
     }
 
     if (command === '!rejectsuggest') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
         const targetedUserStringId = args[1];
-        const administrativeDenialNote = args.slice(2).join(' ') || 'No clarifying evaluation text accompanied this decision entry.';
-        if (!targetedUserStringId) return message.reply('❌ Argument Error: Usage: `!rejectsuggest <userId> <reason>`');
+        const administrativeDenialNote = args.slice(2).join(' ') || 'No reasoning text accompanied this log entry decision.';
+        if (!targetedUserStringId) return message.reply('❌ Usage: `!rejectsuggest <userId> <reason>`');
 
         const resolvedTargetUser = await client.users.fetch(targetedUserStringId).catch(() => null);
         if (resolvedTargetUser) {
-            await resolvedTargetUser.send(`🎟️ **Proposal Status Notification:** Your structural feature suggestion for **${message.guild.name}** was reviewed and declined based on the following logistical criteria:\n📝 *"${administrativeDenialNote}"*\nThank you for contributing to our platform ecosystems.`).catch(() => {});
-            return message.reply('✅ Automation Update: User notified of proposal decline log parameters.');
+            await resolvedTargetUser.send(`🎟️ **Proposal Turned Down:** Your suggestion for **${message.guild.name}** was reviewed and declined for the following reason:\n📝 *"${administrativeDenialNote}"*\nThanks for contributing ideas anyway!`).catch(() => {});
+            return message.reply('✅ The user has been notified of their proposal rejection.');
         }
-        return message.reply('❌ Lookup Failure: User asset mapping data unreached.');
+        return message.reply('❌ Lookup Failure: Could not locate that user profile ID.');
     }
 
     // ==========================================
-    //            ENTERTAINMENT COMMANDS         
+    //            CASINO LOGIC MODULES           
     // ==========================================
     
-    // CHAOTIC RECIPE STRING COMPILER
+    // CHAOTIC RECIPE GENERATOR
     if (command === '!bananabread') {
         const measurements = ['cups', 'tsp', 'tbsp', 'units', 'kilograms', 'drops'];
         const generateChaoticMetrics = (ingredientLabel) => {
             const numericalCoefficient = Math.floor(Math.random() * 100) + 1; 
             const randomizedUnit = measurements[Math.floor(Math.random() * measurements.length)];
-            return `* 🍌 **${numericalCoefficient} ${randomizedUnit}** — ${ingredientLabel}`;
+            return `* 🍌 **${numericalCoefficient} ${randomizedUnit}** of ${ingredientLabel}`;
         };
 
         const embed = new EmbedBuilder()
             .setColor('#FFE4C4')
-            .setTitle('🍌 Chaotic Banana Bread Computational Formula')
-            .setDescription('Execute the following procedural metrics under structural heat constraints:')
+            .setTitle('🍌 Chaotic Banana Bread Formula')
+            .setDescription('Follow this formula exactly if you want to bake banana bread:')
             .addFields(
                 {
-                    name: '📋 Requisite Components Matrix',
+                    name: '📋 Ingredient Measurements Matrix',
                     value: [
                         generateChaoticMetrics('Matured Bananas'),
-                        generateChaoticMetrics('Liquefied Butter Fats'),
-                        generateChaoticMetrics('Sodium Bicarbonate'),
-                        generateChaoticMetrics('Sodium Chloride Crystals'),
-                        generateChaoticMetrics('Granulated Sucrose Extract'),
-                        generateChaoticMetrics('Homogenized Poultry Oocyte'),
-                        generateChaoticMetrics('Concentrated Vanilla Extract Essence'),
-                        generateChaoticMetrics('Enriched Wheat Flour Substrate')
+                        generateChaoticMetrics('Melted Butter Fat'),
+                        generateChaoticMetrics('Baking Soda'),
+                        generateChaoticMetrics('Salt Crystals'),
+                        generateChaoticMetrics('Granulated Sugar'),
+                        generateChaoticMetrics('Beaten Egg'),
+                        generateChaoticMetrics('Vanilla Extract'),
+                        generateChaoticMetrics('All-Purpose Flour')
                     ].join('\n')
                 }
             )
-            .setFooter({ text: 'Thermal Guidelines: 180°C Standard System Baking Parameters.' })
+            .setFooter({ text: 'Baking Guidelines: Standard 180°C thermal environment settings.' })
             .setTimestamp();
 
         return message.channel.send({ embeds: [embed] });
@@ -818,90 +846,87 @@ client.on('messageCreate', async message => {
 
     if (command === '!8ball') {
         const operationalInquiry = args.slice(1).join(' ');
-        if (!operationalInquiry) return message.reply('🎱 Verification Error: Input question data parameters.');
+        if (!operationalInquiry) return message.reply('🎱 Please ask a specific question.');
 
         const determinedIndexResult = customEightBallAnswers[Math.floor(Math.random() * customEightBallAnswers.length)];
-        return message.reply(`🎱 Predictive Output: **${determinedIndexResult}**`);
+        return message.reply(`🎱 8-Ball Prediction: **${determinedIndexResult}**`);
     }
 
     if (command === '!rps') {
         const handGestureInput = args[1]?.toLowerCase();
         if (!['rock', 'paper', 'scissors'].includes(handGestureInput)) {
-            return message.reply('❌ Execution Error: Valid parameters: `!rps rock/paper/scissors`');
+            return message.reply('❌ Usage error. Valid parameters: `!rps rock/paper/scissors`');
         }
 
         const algorithmicPool = ['rock', 'paper', 'scissors'];
         const virtualCompetitorPick = algorithmicPool[Math.floor(Math.random() * algorithmicPool.length)];
 
-        let calculationResultOutcome = 'Evaluation: Tactical Draw Matrix.';
+        let calculationResultOutcome = 'You tied! Game drawn.';
         if (
             (handGestureInput === 'rock' && virtualCompetitorPick === 'scissors') ||
             (handGestureInput === 'paper' && virtualCompetitorPick === 'rock') ||
             (handGestureInput === 'scissors' && virtualCompetitorPick === 'paper')
         ) { 
-            calculationResultOutcome = 'Evaluation: User Victory Evaluated.'; 
+            calculationResultOutcome = 'You won!'; 
         } else if (handGestureInput !== virtualCompetitorPick) { 
-            calculationResultOutcome = 'Evaluation: Client Core Engine Victory.'; 
+            calculationResultOutcome = 'You lost!'; 
         }
 
-        return message.reply(`✊ Client Selection: **${handGestureInput}** | Engine Node Pick: **${virtualCompetitorPick}**\n${calculationResultOutcome}`);
+        return message.reply(`✊ You picked: **${handGestureInput}** | Bot picked: **${virtualCompetitorPick}**\n${calculationResultOutcome}`);
     }
 
     if (command === '!roll' || command === '!dice') {
         const numericalBoundaryLimit = cleanAmount(args[1]) || 6;
-        return message.reply(`🎲 Probability Vector Resolved: Value **${Math.floor(Math.random() * numericalBoundaryLimit) + 1}**.`);
+        return message.reply(`🎲 Dice roll resolved to value: **${Math.floor(Math.random() * numericalBoundaryLimit) + 1}**.`);
     }
 
     if (command === '!coin') {
-        return message.reply(`🪙 Binary Vector State Result: **${Math.random() > 0.5 ? 'Heads' : 'Tails'}**`);
+        return message.reply(`🪙 Coin flip result: **${Math.random() > 0.5 ? 'Heads' : 'Tails'}**`);
     }
 
     if (command === '!choose') {
         const textOptionsInput = args.slice(1).join(' ');
-        if (!textOptionsInput.includes('|')) return message.reply('❌ Argument Error: Utilize a parsing delimiter syntax string (e.g., `!choose option A | option B`)');
+        if (!textOptionsInput.includes('|')) return message.reply('❌ Error: Split options with a vertical separator formatting token (e.g., `!choose option A | option B`)');
 
         const arrayedCleanOptions = textOptionsInput.split('|').map(x => x.trim()).filter(Boolean);
-        return message.reply(`🔮 Algorithmic Arbitrator Decision: **${arrayedCleanOptions[Math.floor(Math.random() * arrayedCleanOptions.length)]}**`);
+        return message.reply(`🔮 Arbitrator Choice: **${arrayedCleanOptions[Math.floor(Math.random() * arrayedCleanOptions.length)]}**`);
     }
 
     if (command === '!poll') {
         const inquiryDescriptionText = args.slice(1).join(' ');
-        if (!inquiryDescriptionText) return message.reply('❌ Parameter Validation Failure: Data string required.');
+        if (!inquiryDescriptionText) return message.reply('❌ Survey Error: Please type out a survey description string.');
 
-        const activePollMessageInstance = await message.channel.send(`📊 **Formal Survey Metric:** ${inquiryDescriptionText}\n✅ = Affirmative Approval\n❌ = Negative Dissent`);
+        const activePollMessageInstance = await message.channel.send(`📊 **Poll Questionnaire:** ${inquiryDescriptionText}\n✅ = Affirmative Approval\n❌ = Negative Dissent`);
         await activePollMessageInstance.react('✅');
         await activePollMessageInstance.react('❌');
         return;
     }
 
-    // ==========================================
-    //           CASINO INTERFACE OPERATIONS     
-    // ==========================================
     if (command === '!coinflip') {
         const chosenBinaryState = args[1]?.toLowerCase();
         const assetBetQuantity = cleanAmount(args[2]);
 
         if (!['heads', 'tails'].includes(chosenBinaryState) || !assetBetQuantity || assetBetQuantity <= 0) {
-            return message.reply('❌ Operational Argument Error: Syntax requirements: `!coinflip <heads/tails> <bet>`');
+            return message.reply('❌ Argument Layout Error. Correct syntax: `!coinflip <heads/tails> <bet>`');
         }
 
-        if (userData.coins < assetBetQuantity) return message.reply('❌ Transaction Fault: Available account reserves insufficient.');
+        if (userData.coins < assetBetQuantity) return message.reply('❌ Transaction Canceled: You do not have enough coins.');
 
         const randomizedVectorOutput = Math.random() > 0.5 ? 'heads' : 'tails';
 
         if (randomizedVectorOutput === chosenBinaryState) {
             userData.coins += assetBetQuantity;
             await userData.save();
-            return message.reply(`🪙 Output State: **${randomizedVectorOutput}**. Yield Adjustment: 🪙 **+${assetBetQuantity}** authorized.`);
+            return message.reply(`🪙 It landed on **${randomizedVectorOutput}**! You won! **+${assetBetQuantity} coins**.`);
         }
 
         userData.coins -= assetBetQuantity;
         await userData.save();
-        message.reply(`🪙 Output State: **${randomizedVectorOutput}**. Yield Adjustment: 🪙 **-${assetBetQuantity}** executed.`);
+        message.reply(`🪙 It landed on **${randomizedVectorOutput}**. You lost! **-${assetBetQuantity} coins**.`);
 
         if (assetBetQuantity >= 5000) {
             try {
-                await message.author.send(`💀 **High-Risk Financial Alert:** A massive downside transaction of 🪙 **${assetBetQuantity} coins** has compromised your ledger during a coinflip event inside **${message.guild.name}**. Balance mitigation highly advised.`);
+                await message.author.send(`💀 **High-Risk Loss Notification:** You just lost **-${assetBetQuantity} coins** on a coinflip event inside **${message.guild.name}**.`);
             } catch {}
         }
         return;
@@ -909,7 +934,7 @@ client.on('messageCreate', async message => {
 
     if (command === '!blackjack' || command === '!bj') {
         const assetBetQuantity = cleanAmount(args[1]);
-        if (!assetBetQuantity || assetBetQuantity <= 0 || userData.coins < assetBetQuantity) return message.reply('❌ Accounting Error: Specified allocation bet value invalid.');
+        if (!assetBetQuantity || assetBetQuantity <= 0 || userData.coins < assetBetQuantity) return message.reply('❌ Accounting Error: Specified bet value parameter invalid.');
 
         const userScoreAllocation = Math.floor(Math.random() * 11) + 10;
         const systemHouseScoreAllocation = Math.floor(Math.random() * 11) + 10;
@@ -917,20 +942,20 @@ client.on('messageCreate', async message => {
         if (userScoreAllocation > systemHouseScoreAllocation || systemHouseScoreAllocation > 21) {
             userData.coins += assetBetQuantity;
             await userData.save();
-            return message.reply(`🃏 User Hand Value: **${userScoreAllocation}** | Dealer Hand Value: **${systemHouseScoreAllocation}**\n🎉 Result: Capital Yield Increased by 🪙 **${assetBetQuantity}**.`);
+            return message.reply(`🃏 Your score: **${userScoreAllocation}** | Dealer score: **${systemHouseScoreAllocation}**\n🎉 You won! **+${assetBetQuantity} coins**.`);
         }
 
         if (userScoreAllocation === systemHouseScoreAllocation) {
-            return message.reply(`🃏 User Hand Value: **${userScoreAllocation}** | Dealer Hand Value: **${systemHouseScoreAllocation}**\n🤝 Result: Capital Equivalence Push.`);
+            return message.reply(`🃏 Your score: **${userScoreAllocation}** | Dealer score: **${systemHouseScoreAllocation}**\n🤝 Game ended in a push.`);
         }
 
         userData.coins -= assetBetQuantity;
         await userData.save();
-        message.reply(`🃏 User Hand Value: **${userScoreAllocation}** | Dealer Hand Value: **${systemHouseScoreAllocation}**\n💀 Result: Capital Liquidation Deficit of 🪙 **${assetBetQuantity}**.`);
+        message.reply(`🃏 Your score: **${userScoreAllocation}** | Dealer score: **${systemHouseScoreAllocation}**\n💀 You lost! **-${assetBetQuantity} coins**.`);
 
         if (assetBetQuantity >= 5000) {
             try {
-                await message.author.send(`🃏 **High Roller Loss Report:** Capital extraction notice triggered. Your recent card index calculation lost 🪙 **${assetBetQuantity} coins** to the house core inside **${message.guild.name}**.`);
+                await message.author.send(`🃏 **High-Risk Loss Notification:** Your recent blackjack hand failed, losing **-${assetBetQuantity} coins** to the house core in **${message.guild.name}**.`);
             } catch {}
         }
         return;
@@ -941,10 +966,10 @@ client.on('messageCreate', async message => {
         const assetBetQuantity = cleanAmount(args[2]);
 
         if (!['slots', 'dice'].includes(algorithmVariantMode) || !assetBetQuantity || assetBetQuantity <= 0) {
-            return message.reply('❌ Operational Argument Error: System parameters: `!gamble slots/dice <bet>`');
+            return message.reply('❌ Parameter layout error. System formatting structure: `!gamble slots/dice <bet>`');
         }
 
-        if (userData.coins < assetBetQuantity) return message.reply('❌ Transaction Fault: Available account reserves insufficient.');
+        if (userData.coins < assetBetQuantity) return message.reply('❌ Transaction Canceled: You do not have enough coins.');
 
         if (algorithmVariantMode === 'slots') {
             const visualMatrixTokens = ['🍒', '🍋', '🍇', '💎', '🔥'];
@@ -957,15 +982,15 @@ client.on('messageCreate', async message => {
             if (compilationResultRow[0] === compilationResultRow[1] && compilationResultRow[1] === compilationResultRow[2]) {
                 userData.coins += assetBetQuantity * 3;
                 await userData.save();
-                return message.reply(`🎰 Slot Matrix Out: [ ${compilationResultRow.join(' | ')} ]\n🔥 Structural Alignment Success! Premium Yield: 🪙 **${assetBetQuantity * 3}** assigned.`);
+                return message.reply(`🎰 Slot Display: [ ${compilationResultRow.join(' | ')} ]\n🔥 Jackpot hit! You won **+${assetBetQuantity * 3} coins**!`);
             }
 
             userData.coins -= assetBetQuantity;
             await userData.save();
-            message.reply(`🎰 Slot Matrix Out: [ ${compilationResultRow.join(' | ')} ]\n💀 Structural Alignment Mismatch. Deficit: 🪙 **-${assetBetQuantity}**.`);
+            message.reply(`🎰 Slot Display: [ ${compilationResultRow.join(' | ')} ]\n💀 No matches. You lost! **-${assetBetQuantity} coins**.`);
 
             if (assetBetQuantity >= 5000) {
-                try { await message.author.send(`🎰 **High-Risk Exposure Alert:** Mechanical matrix verification failed to align, causing a loss of 🪙 **${assetBetQuantity} coins** in **${message.guild.name}**.`); } catch {}
+                try { await message.author.send(`🎰 **High-Risk Loss Notification:** Slot configuration tokens failed to match, losing **-${assetBetQuantity} coins** in **${message.guild.name}**.`); } catch {}
             }
             return;
         }
@@ -974,30 +999,30 @@ client.on('messageCreate', async message => {
         if (resolvedDiceInteger >= 4) {
             userData.coins += assetBetQuantity;
             await userData.save();
-            return message.reply(`🎲 Integer Value Achieved: **${resolvedDiceInteger}**. Probability Success. Authorized: 🪙 **${assetBetQuantity}**.`);
+            return message.reply(`🎲 Dice rolled value: **${resolvedDiceInteger}**. You won! **+${assetBetQuantity} coins**.`);
         }
 
         userData.coins -= assetBetQuantity;
         await userData.save();
-        message.reply(`🎲 Integer Value Achieved: **${resolvedDiceInteger}**. Probability Defeat. Authorized: 🪙 **-${assetBetQuantity}**.`);
+        message.reply(`🎲 Dice rolled value: **${resolvedDiceInteger}**. You lost! **-${assetBetQuantity} coins**.`);
 
         if (assetBetQuantity >= 5000) {
-            try { await message.author.send(`🎲 **Disciplinary Math Alert:** Mathematical rolling probabilities failed to resolve favorably, dropping 🪙 **${assetBetQuantity}** from your active wallet balances.`); } catch {}
+            try { await message.author.send(`🎲 **High-Risk Loss Notification:** Dice tracking calculations resulted in a loss of **-${assetBetQuantity} coins** in balance indicators.`); } catch {}
         }
         return;
     }
 
     if (command === '!rob') {
         const targetIdentityReference = message.mentions.members.first();
-        if (!targetIdentityReference || targetIdentityReference.id === message.author.id) return message.reply('❌ Security Verification Error: Designated target registry profile invalid.');
+        if (!targetIdentityReference || targetIdentityReference.id === message.author.id) return message.reply('❌ Input Error: Specified target mention profile reference invalid.');
 
         const timestampNow = Date.now();
         if (lastRobbed[message.author.id] && timestampNow - lastRobbed[message.author.id] < 600000) {
-            return message.reply('❌ Operational Lockout: Intercept matrix refresh cooldown active.');
+            return message.reply('❌ Cooldown Active: Robbery intercept matrix is charging.');
         }
 
         const targetedUserDataLog = await getUser(targetIdentityReference.id);
-        if (targetedUserDataLog.coins < 50) return message.reply('❌ Intercept Canceled: Target ledger value rests beneath minimal transaction values.');
+        if (targetedUserDataLog.coins < 50) return message.reply('❌ Execution Error: Target profile ledger value falls beneath minimum baseline asset metrics.');
 
         lastRobbed[message.author.id] = timestampNow;
 
@@ -1009,9 +1034,9 @@ client.on('messageCreate', async message => {
             await targetedUserDataLog.save();
             await userData.save();
 
-            try { await targetIdentityReference.send(`🛡️ **Defense Matrix Notification:** A remote intercept vector targeting your profile ledger inside **${message.guild.name}** was caught and neutralized. Your shield absorption cracked, fully deflected data loss, and fined the hostile actor 🪙 **100 coins**.`); } catch {}
+            try { await targetIdentityReference.send(`🛡️ **Shield Intercept Notice:** Someone tried to run a \`!rob\` script on your wallet in **${message.guild.name}**! Your protection shield absorbed the breach, blocked all theft data, and counter-fined the attacker **+100 coins** directly to your pocket parameters.`); } catch {}
             
-            return message.reply(`🚨 **Defense Intercept Deflection:** You initiated a data raid on <@${targetIdentityReference.id}>, but your script tripped an active **Defensive Shield**. Access denied. A network feedback penalty of 🪙 **100 coins** was extracted and assigned to their account parameters.`);
+            return message.reply(`🚨 **Shield Blocked:** You tried to rob <@${targetIdentityReference.id}>, but they had an active **Theft Protection Shield**! Your tools broke and a network counter-fine of **-100 coins** was instantly debited to their wallet profile.`);
         }
 
         if (Math.random() < 0.35) {
@@ -1020,141 +1045,141 @@ client.on('messageCreate', async message => {
             userData.coins += hijackedCapitalVolume;
             await targetedUserDataLog.save();
             await userData.save();
-            return message.reply(`🥷 Data Breach Validated: Successfully extracted 🪙 **${hijackedCapitalVolume} Flame Coins** from target ledger.`);
+            return message.reply(`🥷 Success! You managed to sneak out and rob **+${hijackedCapitalVolume} coins** from their ledger profile.`);
         }
 
         userData.coins = Math.max(0, userData.coins - 30);
         await userData.save();
-        return message.reply('🚨 System Alarm Security Alert: Intrusion detected. Local enforcement fine of 🪙 **30 coins** debited.');
+        return message.reply('🚨 Caught! You failed the robbery attempt and were fined **-30 coins** by local enforcement logs.');
     }
 
     // ==========================================
     //           DISCIPLINARY MODERATION         
     // ==========================================
     if (command === '!clear' || command === '!purge') {
-        if (!isStaff(message.member)) return message.reply('❌ Authorization Error: Requires Trial Mod or superior privileges.');
+        if (!isStaff(message.member)) return message.reply('❌ Requires Trial Mod or superior privileges.');
 
         const targetedPurgeVolume = cleanAmount(args[1]);
-        if (!targetedPurgeVolume || targetedPurgeVolume < 1 || targetedPurgeVolume > 100) return message.reply('❌ Argument Range Error: Valid integer parameters fall between 1 and 100.');
+        if (!targetedPurgeVolume || targetedPurgeVolume < 1 || targetedPurgeVolume > 100) return message.reply('❌ Clear value out of boundary ranges. Input an integer parameter between 1 and 100.');
 
         await message.delete().catch(() => {});
         const executedPurgeMetrics = await message.channel.bulkDelete(targetedPurgeVolume, true);
 
-        const confirmationNoticeMessage = await message.channel.send(`🧹 Maintenance Complete: Purged **${executedPurgeMetrics.size}** text logs from historical cache.`);
+        const confirmationNoticeMessage = await message.channel.send(`🧹 Maintenance: Cleared **${executedPurgeMetrics.size}** messages from channel history text files.`);
         setTimeout(() => confirmationNoticeMessage.delete().catch(() => {}), 4000);
         return;
     }
 
     if (command === '!warn') {
-        if (!isStaff(message.member)) return message.reply('❌ Authorization Error: Restricted to server staff directories.');
+        if (!isStaff(message.member)) return message.reply('❌ Staff only.');
 
         const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Target Parsing Error: Specify target user mention format.');
+        if (!target) return message.reply('❌ Target Error: Please specify target mention user format layout.');
 
         const targetData = await getUser(target.id);
         targetData.warnings += 1;
         await targetData.save();
 
-        const descriptiveReasonText = args.slice(2).join(' ') || 'No clarifying evaluation text provided.';
+        const descriptiveReasonText = args.slice(2).join(' ') || 'No clarifying tracking description text provided.';
 
-        try { await target.send(`⚠️ **Formal Disciplinary Notice from ${message.guild.name}**\n📝 **Reason:** ${descriptiveReasonText}\n📊 **Active Infraction Track:** Index ${targetData.warnings} out of 3 maximum allowable profiles.`); } catch {}
+        try { await target.send(`⚠️ **Warning Notice from ${message.guild.name}**\n📝 **Reason:** ${descriptiveReasonText}\n📊 **Tracking Stats:** Warning tracking index is at ${targetData.warnings}/3 max limit thresholds.`); } catch {}
 
-        await message.channel.send(`⚠️ Infraction Documented: ${target} has been formally warned. Tracking: **${targetData.warnings}/3**.`);
+        await message.channel.send(`⚠️ Warning Logged: ${target} has been formally issued an infraction. Count: **${targetData.warnings}/3**.`);
 
-        const disciplinaryAuditLogsEmbed = new EmbedBuilder().setColor('#FFA500').setTitle('🚨 Operational Log Entry: Disciplinary Infraction Issued').addFields({ name: 'Responsible Staff Officer', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Offending Identity', value: `<@${target.id}>`, inline: true }, { name: 'Documented Log Basis', value: descriptiveReasonText }).setTimestamp();
+        const disciplinaryAuditLogsEmbed = new EmbedBuilder().setColor('#FFA500').setTitle('🚨 System Audit Log: Infraction Warning Issued').addFields({ name: 'Responsible Staff Officer', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Offending Identity', value: `<@${target.id}>`, inline: true }, { name: 'Documented Reason Log', value: descriptiveReasonText }).setTimestamp();
         await dmServerLeadership(message.guild, disciplinaryAuditLogsEmbed);
 
         if (targetData.warnings >= 3) {
-            if (!target.kickable) return message.channel.send('❌ Architecture Error: Target structural clearance protects identity from auto-expulsion execution.');
-            try { await target.send(`🥾 **Automatic Account Expulsion Notice:** You have been automatically removed from **${message.guild.name}** for reaching the limit of 3 concurrent tracked infractions.`); } catch {}
-            await target.kick('Exceeded max structural infraction capacity.');
+            if (!target.kickable) return message.channel.send('❌ Permissions Error: Target account hierarchy protection block keeps bot from executing automated kick profiles.');
+            try { await target.send(`🥾 **Auto-Kick Notice:** You have been removed from **${message.guild.name}** for accumulating 3 active tracked system warnings.`); } catch {}
+            await target.kick('Exceeded maximum tracking warning capacities.');
             targetData.warnings = 0;
             await targetData.save();
-            return message.channel.send('🥾 System Action: Threshold reached. Targeted identity has been auto-kicked.');
+            return message.channel.send('🥾 Auto-Kick: User reached the max threshold boundary of 3 warnings and was expelled.');
         }
         return;
     }
 
     if (command === '!warnings') {
-        if (!isStaff(message.member)) return message.reply('❌ Authorization Error: Restricted to server staff directories.');
+        if (!isStaff(message.member)) return message.reply('❌ Staff only.');
 
         const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Target Parsing Error: Specify target user mention format.');
+        if (!target) return message.reply('❌ Target Error: Please specify target mention user format layout.');
 
         const targetData = await getUser(target.id);
-        return message.reply(`📋 System Tracking Status: User **${target.user.username}** displays **${targetData.warnings}** active warning counts.`);
+        return message.reply(`📋 Infraction Tracking: User **${target.user.username}** has **${targetData.warnings}** active warnings recorded.`);
     }
 
     if (command === '!clearwarns') {
-        if (!isMod(message.member)) return message.reply('❌ Authorization Error: Restricted to Moderator or superior roles.');
+        if (!isMod(message.member)) return message.reply('❌ Requires Moderator or superior roles.');
 
         const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Target Parsing Error: Specify target user mention format.');
+        if (!target) return message.reply('❌ Target Error: Please specify target mention user format layout.');
 
         await User.updateOne({ id: target.id }, { $set: { warnings: 0 } }, { upsert: true });
-        return message.reply('✅ Ledger Cleared: User disciplinary logging tracking counters reset to zero values.');
+        return message.reply('✅ Warning counts reset to baseline zero variables successfully.');
     }
 
     if (command === '!mute') {
-        if (!isStaff(message.member)) return message.reply('❌ Authorization Error: Restricted to server staff directories.');
+        if (!isStaff(message.member)) return message.reply('❌ Staff only.');
 
         const target = message.mentions.members.first();
         const designatedMuteRole = message.guild.roles.cache.get(MUTE_ROLE_ID);
 
-        if (!target || !designatedMuteRole) return message.reply('❌ Operational Error: Target identity reference or system mute role mapping missing.');
+        if (!target || !designatedMuteRole) return message.reply('❌ Configuration Error: Target profile link or system mute role tracking ID unresolved.');
         await target.roles.add(designatedMuteRole);
-        message.reply(`🤫 Disciplinary Status: Communications restriction layer attached to ${target}.`);
+        message.reply(`🤫 Communications restricted for ${target}.`);
 
-        try { await target.send(`🤫 **System Communications Warning:** Your communication access has been restricted in **${message.guild.name}** by administrative decision.`); } catch {}
-        const administrativeActionLogsEmbed = new EmbedBuilder().setColor('#FF8C00').setTitle('🤫 Operational Log Entry: Communications Terminated').addFields({ name: 'Enforcing Staff Officer', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Restricted Identity', value: `<@${target.id}>`, inline: true }).setTimestamp();
+        try { await target.send(`🤫 **Mute Notice:** Your broadcast permissions have been muted in **${message.guild.name}** by staff decision metrics.`); } catch {}
+        const administrativeActionLogsEmbed = new EmbedBuilder().setColor('#FF8C00').setTitle('🤫 System Audit Log: Communication Restrictions Applied').addFields({ name: 'Responsible Staff Officer', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Restricted Identity', value: `<@${target.id}>`, inline: true }).setTimestamp();
         await dmServerLeadership(message.guild, administrativeActionLogsEmbed);
         return;
     }
 
     if (command === '!unmute') {
-        if (!isStaff(message.member)) return message.reply('❌ Authorization Error: Restricted to server staff directories.');
+        if (!isStaff(message.member)) return message.reply('❌ Staff only.');
 
         const target = message.mentions.members.first();
         const designatedMuteRole = message.guild.roles.cache.get(MUTE_ROLE_ID);
 
-        if (!target || !designatedMuteRole) return message.reply('❌ Operational Error: Target identity reference or system mute role mapping missing.');
+        if (!target || !designatedMuteRole) return message.reply('❌ Configuration Error: Target profile link or system mute role tracking ID unresolved.');
         await target.roles.remove(designatedMuteRole);
-        message.reply(`🔊 Disciplinary Status: Communications restriction layer detached from ${target}.`);
+        message.reply(`🔊 Communications restriction lifted for ${target}.`);
 
-        try { await target.send(`🔊 **System Communications Notice:** Your broadcast permissions have been restored in **${message.guild.name}**.`); } catch {}
+        try { await target.send(`🔊 **Unmute Notice:** Your text channel broadcast permissions have been restored in **${message.guild.name}**.`); } catch {}
         return;
     }
 
     if (command === '!tempmute') {
-        if (!isStaff(message.member)) return message.reply('❌ Authorization Error: Restricted to server staff directories.');
+        if (!isStaff(message.member)) return message.reply('❌ Staff only.');
 
         const target = message.mentions.members.first();
         const scheduledMinutesLimit = cleanAmount(args[2]);
         const designatedMuteRole = message.guild.roles.cache.get(MUTE_ROLE_ID);
 
-        if (!target || !scheduledMinutesLimit || !designatedMuteRole) return message.reply('❌ Operational Argument Error: Usage syntax: `!tempmute @user <minutes>`');
+        if (!target || !scheduledMinutesLimit || !designatedMuteRole) return message.reply('❌ Parameter Layout Error. Syntax matching requirements: `!tempmute @user <minutes>`');
 
         await target.roles.add(designatedMuteRole);
-        message.reply(`🤫 Disciplinary Status: Communications tracking restriction applied to ${target} for **${scheduledMinutesLimit}m**.`);
+        message.reply(`🤫 Communications restricted for ${target} for a duration window of **${scheduledMinutesLimit} minutes**.`);
 
-        try { await target.send(`🤫 **System Communications Warning:** Your broadcast access has been restricted in **${message.guild.name}** for a timeframe spanning **${scheduledMinutesLimit} minutes**.`); } catch {}
+        try { await target.send(`🤫 **Temporal Mute Notice:** Your broadcast permissions have been temporarily restricted in **${message.guild.name}** for **${scheduledMinutesLimit}m**.`); } catch {}
 
         setTimeout(async () => {
             try {
                 await target.roles.remove(designatedMuteRole);
-                message.channel.send(`🔊 System Timer Expiration: Restricted role profile detached automatically from ${target}.`);
-                await target.send(`🔊 **System Communications Notice:** Your temporal restriction interval in **${message.guild.name}** has elapsed.`);
+                message.channel.send(`🔊 Timer Expiration: Restricted broadcast access permissions automatically restored to ${target}.`);
+                await target.send(`🔊 **Unmute Notice:** Your temporary restriction timeframe in **${message.guild.name}** has elapsed.`);
             } catch {}
         }, scheduledMinutesLimit * 60000);
         return;
     }
 
     if (command === '!kick') {
-        if (!isMod(message.member)) return message.reply('❌ Authorization Error: Restricted to Moderator or superior roles.');
+        if (!isMod(message.member)) return message.reply('❌ Requires Moderator or superior roles.');
 
         const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Target Parsing Error: Specify target user mention format.');
-        if (!target.kickable) return message.reply('❌ Protection Error: Core API permissions layout prevents execution against target node.');
+        if (!target) return message.reply('❌ Target Error: Please specify target mention user format layout.');
+        if (!target.kickable) return message.reply('❌ Core permissions limitation layer protects target identity index from bot-kick mechanics.');
 
         let timeModifierArg = args[2];
         let structuralHoldDuration = null;
@@ -1170,22 +1195,22 @@ client.on('messageCreate', async message => {
             }
         }
 
-        const explicitReasonStringLog = args.slice(indexReasonTrackingPointer).join(' ') || 'No clarifying evaluation text provided.';
+        const explicitReasonStringLog = args.slice(indexReasonTrackingPointer).join(' ') || 'No tracking reason accompanied this action record execution file.';
 
-        try { await target.send(`⚠️ **Account Expulsion Documented from ${message.guild.name}**\n📝 **Basis Criteria:** ${explicitReasonStringLog}${structuralHoldDuration ? `\n⏱️ **Re-entry Cooldown Window:** ${timeModifierArg}` : ''}`); } catch {}
+        try { await target.send(`⚠️ **Expulsion Notice issued from ${message.guild.name}**\n📝 **Reason Logs:** ${explicitReasonStringLog}${structuralHoldDuration ? `\n⏱️ **Re-entry Gate Cooldown Lock:** ${timeModifierArg}` : ''}`); } catch {}
 
         await target.kick(explicitReasonStringLog);
-        message.reply(`🥾 Expulsion Complete: Successfully detached **${target.user.username}** from guild directories.`);
+        message.reply(`🥾 Expulsion finalized: User account profile **${target.user.username}** kicked from server entries.`);
 
-        const administrativeActionLogsEmbed = new EmbedBuilder().setColor('#FF0000').setTitle('🥾 Operational Log Entry: Account Expulsion Executed').addFields({ name: 'Enforcing Staff Officer', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Account Identity', value: `${target.user.tag} (${target.id})`, inline: true }, { name: 'Temporal Lockout Threshold', value: structuralHoldDuration ? timeModifierArg : 'None Deployed', inline: true }, { name: 'Documented Log Basis', value: explicitReasonStringLog }).setTimestamp();
+        const administrativeActionLogsEmbed = new EmbedBuilder().setColor('#FF0000').setTitle('🥾 System Audit Log: User Account Expulsion Executed').addFields({ name: 'Responsible Staff Officer', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Expelled Identity', value: `${target.user.tag} (${target.id})`, inline: true }, { name: 'Re-entry Lock Period', value: structuralHoldDuration ? timeModifierArg : 'Immediate Return Allowed', inline: true }, { name: 'Documented Reason Log', value: explicitReasonStringLog }).setTimestamp();
         await dmServerLeadership(message.guild, administrativeActionLogsEmbed);
 
         if (structuralHoldDuration) {
             const cachingTargetUserObj = target.user;
             setTimeout(async () => {
                 try {
-                    const structuralGatewayInvite = await message.guild.channels.cache.filter(c => c.type === 0).first().createInvite({ maxAge: 86400, maxUses: 1, reason: 'Temporal re-entry gateway lock expiration release.' });
-                    await cachingTargetUserObj.send(`👋 System Update: Your temporary expulsion lock for **${message.guild.name}** has cleared. You may return via this unique single-use link token: ${structuralGatewayInvite.url}`);
+                    const structuralGatewayInvite = await message.guild.channels.cache.filter(c => c.type === 0).first().createInvite({ maxAge: 86400, maxUses: 1, reason: 'Temporal re-entry lockout matrix expiration release.' });
+                    await cachingTargetUserObj.send(`👋 Re-entry Update: Your kick cooldown lock inside **${message.guild.name}** has elapsed. Use this single-use link token to return: ${structuralGatewayInvite.url}`);
                 } catch {}
             }, structuralHoldDuration);
         }
@@ -1193,11 +1218,11 @@ client.on('messageCreate', async message => {
     }
 
     if (command === '!ban' || command === '!tempban') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
 
         const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Target Parsing Error: Specify target user mention format.');
-        if (!target.bannable) return message.reply('❌ Protection Error: Core API permissions layout prevents server ban execution against target node.');
+        if (!target) return message.reply('❌ Target Error: Please specify target mention user format layout.');
+        if (!target.bannable) return message.reply('❌ Permissions Error: Target position rests above bot access layout restrictions.');
 
         let timeModifierArg = args[2];
         let structuralHoldDuration = null;
@@ -1213,15 +1238,15 @@ client.on('messageCreate', async message => {
             }
         }
 
-        const explicitReasonStringLog = args.slice(indexReasonTrackingPointer).join(' ') || 'No clarifying evaluation text provided.';
+        const explicitReasonStringLog = args.slice(indexReasonTrackingPointer).join(' ') || 'No tracking reason accompanied this action record execution file.';
         const cachingTargetUserObj = target.user;
 
-        try { await target.send(`🔨 **Network Ban Notice issued from ${message.guild.name}**\n📝 **Basis Criteria:** ${explicitReasonStringLog}\n⏱️ **Access Lock Horizon Type:** ${structuralHoldDuration ? `Temporary Ban Condition (${timeModifierArg})` : 'Permanent Account Exclusion Lifecycle'}`); } catch {}
+        try { await target.send(`🔨 **Network Firewall Rule Notice issued from ${message.guild.name}**\n📝 **Reason Logs:** ${explicitReasonStringLog}\n⏱️ **Ban Horizon Type:** ${structuralHoldDuration ? `Temporary Access Ban (${timeModifierArg})` : 'Permanent Identity Exclusion'}`); } catch {}
 
         await target.ban({ reason: explicitReasonStringLog });
-        message.reply(`🔨 Firewall Rule Implemented: Network ban successfully issued against **${cachingTargetUserObj.username}**.`);
+        message.reply(`🔨 Firewall Lock Active: Network ban deployed against user account entry **${cachingTargetUserObj.username}**.`);
 
-        const administrativeActionLogsEmbed = new EmbedBuilder().setColor('#8B0000').setTitle('🔨 Operational Log Entry: Firewall Network Ban Deployed').addFields({ name: 'Enforcing Admin Officer', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Restrained User', value: `${cachingTargetUserObj.tag}`, inline: true }, { name: 'Horizon Constraint', value: structuralHoldDuration ? `Temporary Lockout (${timeModifierArg})` : 'Permanent Profile Erasure', inline: true }, { name: 'Documented Log Basis', value: explicitReasonStringLog }).setTimestamp();
+        const administrativeActionLogsEmbed = new EmbedBuilder().setColor('#8B0000').setTitle('🔨 System Audit Log: Network Ban Firewall Deployed').addFields({ name: 'Responsible Admin Officer', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Restricted User Profile', value: `${cachingTargetUserObj.tag}`, inline: true }, { name: 'Access Hold Horizon Constraints', value: structuralHoldDuration ? `Temporary Lock (${timeModifierArg})` : 'Permanent Asset Erasure', inline: true }, { name: 'Documented Reason Log', value: explicitReasonStringLog }).setTimestamp();
         await dmServerLeadership(message.guild, administrativeActionLogsEmbed);
 
         if (structuralHoldDuration) {
@@ -1229,9 +1254,9 @@ client.on('messageCreate', async message => {
                 try {
                     const compiledBansGuildList = await message.guild.bans.fetch();
                     if (compiledBansGuildList.has(cachingTargetUserObj.id)) {
-                        await message.guild.members.unban(cachingTargetUserObj.id, 'Temporal network ban lease configuration elapsing.');
-                        const structuralGatewayInvite = await message.guild.channels.cache.filter(c => c.type === 0).first().createInvite({ maxAge: 86400, maxUses: 1, reason: 'Temporal lock release access invite generation.' });
-                        await cachingTargetUserObj.send(`🔓 System Firewall Update: Your temporary network ban window from **${message.guild.name}** has elapsed. Access authorization reinstated. Join link: ${structuralGatewayInvite.url}`);
+                        await message.guild.members.unban(cachingTargetUserObj.id, 'Temporary firewall exclusion lease period concluded.');
+                        const structuralGatewayInvite = await message.guild.channels.cache.filter(c => c.type === 0).first().createInvite({ maxAge: 86400, maxUses: 1, reason: 'Temporal lock release link asset generation.' });
+                        await cachingTargetUserObj.send(`🔓 Firewall Modification Notice: Your temporary access ban restriction rule from **${message.guild.name}** has expired. Re-entry link token available: ${structuralGatewayInvite.url}`);
                     }
                 } catch {}
             }, structuralHoldDuration);
@@ -1240,118 +1265,118 @@ client.on('messageCreate', async message => {
     }
 
     if (command === '!slowmode') {
-        if (!isMod(message.member)) return message.reply('❌ Authorization Error: Restricted to Moderator or superior roles.');
+        if (!isMod(message.member)) return message.reply('❌ Requires Moderator or superior roles.');
 
         const rawRateLimitValue = args[1]?.toLowerCase();
-        if (!rawRateLimitValue) return message.reply('❌ Argument Error: Usage syntax: `!slowmode <seconds/off>`');
+        if (!rawRateLimitValue) return message.reply('❌ Parameter Layout Error. Syntax layout: `!slowmode <seconds/off>`');
 
         if (rawRateLimitValue === 'off') {
             await message.channel.setRateLimitPerUser(0);
-            return message.reply('✅ Channel Adjustment: Message velocity limits disabled.');
+            return message.reply('✅ Channel update: Message velocity restrictions removed.');
         }
 
         const continuousNumericalSeconds = cleanAmount(rawRateLimitValue);
-        if (continuousNumericalSeconds === null || continuousNumericalSeconds < 0 || continuousNumericalSeconds > 21600) return message.reply('❌ Validation Error: Input value integer falls out of bounds.');
+        if (continuousNumericalSeconds === null || continuousNumericalSeconds < 0 || continuousNumericalSeconds > 21600) return message.reply('❌ Validation Error: Input value matches outside tracking variables.');
 
         await message.channel.setRateLimitPerUser(continuousNumericalSeconds);
-        return message.reply(`📶 Channel Velocity Throttled: Data frame intervals fixed to **${continuousNumericalSeconds} seconds**.`);
+        return message.reply(`📶 Message rate configurations locked down to **${continuousNumericalSeconds} second** intervals.`);
     }
 
     if (command === '!lockchannel') {
-        if (!isMod(message.member)) return message.reply('❌ Authorization Error: Restricted to Moderator or superior roles.');
+        if (!isMod(message.member)) return message.reply('❌ Requires Moderator or superior roles.');
         await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: false });
-        return message.reply('🔒 Channel Lock: Text frame injection access revoked from baseline role groups.');
+        return message.reply('🔒 Channel Locked: Text frame data submission access suspended.');
     }
 
     if (command === '!unlockchannel') {
-        if (!isMod(message.member)) return message.reply('❌ Authorization Error: Restricted to Moderator or superior roles.');
+        if (!isMod(message.member)) return message.reply('❌ Requires Moderator or superior roles.');
         await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: null });
-        return message.reply('🔓 Channel Lock Revocation: Broadcast privileges re-established to baseline role groups.');
+        return message.reply('🔓 Channel Unlocked: Normal baseline communication access re-established.');
     }
 
     // ADMINISTRATIVE FISCAL CAPITAL CONTROLS
     if (command === '!addcoins' || command === '!givecoins') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
 
         const target = message.mentions.members.first();
         const designatedVolume = cleanAmount(args[2]);
-        if (!target || !designatedVolume || designatedVolume <= 0) return message.reply('❌ Validation Error: Syntax configuration: `!addcoins @user <amount>`');
+        if (!target || !designatedVolume || designatedVolume <= 0) return message.reply('❌ Validation error. Usage layout parameters: `!addcoins @user <amount>`');
 
         await User.updateOne({ id: target.id }, { $inc: { coins: designatedVolume } }, { upsert: true });
-        message.reply(`💸 Treasury Mint Authorized: Distributed 🪙 **${designatedVolume}** Flame Coins to ${target.user.username}'s profile ledger.`);
+        message.reply(`💸 Capital Modification: Added 🪙 **+${designatedVolume}** coins to ${target.user.username}'s active ledger balance.`);
 
-        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#00FF7F').setTitle('💰 Central Ledger Injection System Log').addFields({ name: 'Executing Financial Admin', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Beneficiary Account', value: `<@${target.id}>`, inline: true }, { name: 'Total Volume Distributed', value: `🪙 ${designatedVolume} Flame Coins`, inline: true }).setTimestamp();
+        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#00FF7F').setTitle('💰 Treasury System Audit Log: Balance Injection').addFields({ name: 'Responsible Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Beneficiary Account', value: `<@${target.id}>`, inline: true }, { name: 'Net Volume Injected', value: `🪙 ${designatedVolume} Flame Coins`, inline: true }).setTimestamp();
         await dmServerLeadership(message.guild, secretLedgerAuditLogsEmbed);
         return;
     }
 
     if (command === '!removecoins' || command === '!deductcoins') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
 
         const target = message.mentions.members.first();
         const designatedVolume = cleanAmount(args[2]);
-        if (!target || !designatedVolume || designatedVolume <= 0) return message.reply('❌ Validation Error: Syntax configuration: `!removecoins @user <amount>`');
+        if (!target || !designatedVolume || designatedVolume <= 0) return message.reply('❌ Validation error. Usage layout parameters: `!removecoins @user <amount>`');
 
         const targetData = await getUser(target.id);
         targetData.coins = Math.max(0, targetData.coins - designatedVolume);
         await targetData.save();
 
-        message.reply(`📉 Liquidation Confirmed: Extracted 🪙 **${designatedVolume}** Flame Coins from ${target.user.username}'s profile ledger.`);
+        message.reply(`📉 Capital Modification: Deducted 🪙 **-${designatedVolume}** coins from ${target.user.username}'s active ledger balance.`);
 
-        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#FF4500').setTitle('💰 Central Ledger Capital Extraction System Log').addFields({ name: 'Executing Financial Admin', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Asset Account Source', value: `<@${target.id}>`, inline: true }, { name: 'Total Volume Liquidated', value: `🪙 ${designatedVolume} Flame Coins`, inline: true }).setTimestamp();
+        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#FF4500').setTitle('💰 Treasury System Audit Log: Balance Extraction').addFields({ name: 'Responsible Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Account Source', value: `<@${target.id}>`, inline: true }, { name: 'Net Volume Liquidated', value: `🪙 ${designatedVolume} Flame Coins`, inline: true }).setTimestamp();
         await dmServerLeadership(message.guild, secretLedgerAuditLogsEmbed);
         return;
     }
 
     if (command === '!setcoins') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
 
         const target = message.mentions.members.first();
         const designatedVolume = cleanAmount(args[2]);
-        if (!target || designatedVolume === null || designatedVolume < 0) return message.reply('❌ Validation Error: Syntax configuration: `!setcoins @user <amount>`');
+        if (!target || designatedVolume === null || designatedVolume < 0) return message.reply('❌ Validation error. Usage layout parameters: `!setcoins @user <amount>`');
 
         await User.updateOne({ id: target.id }, { $set: { coins: designatedVolume } }, { upsert: true });
-        message.reply(`🔧 Balance Modification Authorized: Overwrote ${target.user.username}'s structural asset holdings value to 🪙 **${designatedVolume}**.`);
+        message.reply(`🔧 Balance Configuration: Set ${target.user.username}'s ledger holding balances exactly to 🪙 **${designatedVolume}**.`);
 
-        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#1E90FF').setTitle('💰 Central Ledger Value Override System Log').addFields({ name: 'Executing Financial Admin', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Asset Account Source', value: `<@${target.id}>`, inline: true }, { name: 'New Explicit Ledger Value Fixed', value: `🪙 ${designatedVolume} Flame Coins`, inline: true }).setTimestamp();
+        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#1E90FF').setTitle('💰 Treasury System Audit Log: Manual Override Set').addFields({ name: 'Responsible Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Identity Profile', value: `<@${target.id}>`, inline: true }, { name: 'Fixed Explicit Value Entry', value: `🪙 ${designatedVolume} Flame Coins`, inline: true }).setTimestamp();
         await dmServerLeadership(message.guild, secretLedgerAuditLogsEmbed);
         return;
     }
 
     if (command === '!resetcoins') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
 
         const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Validation Error: Syntax requirement: `!resetcoins @user`');
+        if (!target) return message.reply('❌ Target Error. Usage requirements: `!resetcoins @user`');
 
         await User.updateOne({ id: target.id }, { $set: { coins: 0 } }, { upsert: true });
-        message.reply(`🧹 Accounts Purge Authorized: Asset metrics cleared to baseline zero parameters for ${target.user.username}.`);
+        message.reply(`🧹 Account balance metrics cleared to zero baseline markers for user profile ${target.user.username}.`);
 
-        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#DCDCDC').setTitle('💰 Central Ledger Account Asset Erasure Log').addFields({ name: 'Executing Financial Admin', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Reset Identity Profile', value: `<@${target.id}>`, inline: true }).setTimestamp();
+        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#DCDCDC').setTitle('💰 Treasury System Audit Log: Balance Purge Authorized').addFields({ name: 'Responsible Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Reset Profile Identity', value: `<@${target.id}>`, inline: true }).setTimestamp();
         await dmServerLeadership(message.guild, secretLedgerAuditLogsEmbed);
         return;
     }
 
     if (command === '!baltable' || command === '!balancetable') {
-        if (!isAdmin(message.member)) return message.reply('❌ Access Denied: Administrator clearance mandatory.');
+        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
 
         const auditedAccountsArray = await User.find().sort({ coins: -1 }).limit(30);
-        const compiledAuditLines = auditedAccountsArray.map((u, i) => `#${i + 1} User: <@${u.id}> — Verified Holdings: ${u.coins}`).join('\n') || 'No database user files currently initialized.';
+        const compiledAuditLines = auditedAccountsArray.map((u, i) => `#${i + 1} Profile: <@${u.id}> — Value Metrics: ${u.coins}`).join('\n') || 'No initialization file registers tracked within database profiles.';
 
         return message.channel.send({
             embeds: [
                 new EmbedBuilder()
                     .setColor('#FFD700')
-                    .setTitle('📊 Centralized Internal Revenue Audit Ledger')
+                    .setTitle('📊 Centralized Server Account Asset Audit Ledger')
                     .setDescription(compiledAuditLines)
             ]
         });
     }
 });
 
-// INITIAL API GATEWAY HANDSHAKE LOGIC
+// INITIAL SYSTEM ACCESS API HANDSHAKE
 if (!TOKEN) {
-    console.error('❌ Critical Launch Failure: DISCORD_TOKEN is absent from system environment records.');
+    console.error('❌ Launch Error: DISCORD_TOKEN configuration string completely absent.');
 } else {
     client.login(TOKEN);
 }
