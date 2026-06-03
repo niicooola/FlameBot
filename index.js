@@ -150,11 +150,62 @@ client.on('messageCreate', async message => {
         });
     }
 
-    // PASSIVE INCOME SYSTEM
+   // PASSIVE INCOME SYSTEM & SMART CONVERSATION TRIGGER
     if (!message.content.startsWith(PREFIX)) {
         userData.coins += CHAT_INCOME;
         userData.xp += 2;
         await userData.save();
+
+        // Only look at messages that are at least a few words long to filter out spam/emojis
+        if (message.content.trim().split(/\s+/).length >= 3) {
+            try {
+                // Step 1: Ask Groq if this message is a good conversational hook
+                const filterCompletion = await groq.chat.completions.create({
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are a message filter for a Discord bot. Analyze the user message. If the message is a question, a call for help, a hot take, or an interesting topic (like Minecraft, gaming, tech, coding), reply with exactly the word "TRIGGER". If it is just general chat hype, a basic greeting, an emoji, or uninteresting filler (e.g., "yooo redflames stream is fire", "wsp", "lol"), reply with exactly the word "IGNORE". Do not include any other text.'
+                        },
+                        { role: 'user', content: message.content }
+                    ],
+                    model: 'llama-3.1-8b-instant',
+                    temperature: 0.1, // Low temperature keeps it strictly following the rules
+                    max_tokens: 10
+                });
+
+                const decision = filterCompletion.choices[0]?.message?.content?.trim().toUpperCase();
+
+                // Step 2: If Groq says "TRIGGER", roll a clean 30% chance to respond so it stays organic
+                if (decision.includes('TRIGGER')) {
+                    const CHANCE_PERCENT = 30; // 30% chance ensures it doesn't reply to literally EVERY question
+                    const randomRoll = Math.floor(Math.random() * 100) + 1;
+
+                    if (randomRoll <= CHANCE_PERCENT) {
+                        await message.channel.sendTyping();
+
+                        const replyCompletion = await groq.chat.completions.create({
+                            messages: [
+                                {
+                                    role: 'system',
+                                    content: 'You are FlameBot, the high-energy AI core for streamer RedFlame. Chime into this Discord conversation naturally. Address what the user said with a witty, helpful, or slightly roasting response using community slang like gng, cooked, bro, or wsp. Keep it very short—maximum 1 or 2 sentences.'
+                                },
+                                { role: 'user', content: `Someone just said this in the server: "${message.content}". Drop a quick response to it.` }
+                            ],
+                            model: 'llama-3.1-8b-instant',
+                            temperature: 0.8,
+                            max_tokens: 150
+                        });
+
+                        const replyText = replyCompletion.choices[0]?.message?.content;
+                        if (replyText) {
+                            return message.reply(replyText); // Uses message.reply so it tethers directly to their comment
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Groq Smart Chat Error:', err);
+            }
+        }
         return;
     }
 
