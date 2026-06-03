@@ -1,6 +1,6 @@
 /**
  * @file index.js
- * @description FlameBot Core Engine — Version 1.7 (Stream Outcome Trigger Update)
+ * @description FlameBot Core Engine — Version 1.8 (FlameCore Streamlined Build)
  * @author Silas Benjamin Fawcett (Nico)
  */
 
@@ -28,6 +28,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 // DISCORD IDENTIFIERS
 const DEV_USER_ID = '1314033520460693635';
 const LEVEL_CHANNEL_ID = '1511569329949380668';
+
 const VIP_ROLE_ID = process.env.VIP_ROLE_ID || '1511458646348009573';
 const MUTE_ROLE_ID = process.env.MUTE_ROLE_ID || '1509040670801789019';
 const STREAM_PING_ROLE_ID = process.env.STREAM_PING_ROLE_ID || '1503627239713935452';
@@ -48,17 +49,6 @@ let systemLogsEnabled = true;
 const PREFIX = '!';
 const CHAT_INCOME = 5;
 const CASINO_COOLDOWN = 30000; 
-
-// DYNAMIC CORE STOCK ENGINE PARAMETERS
-let currentStockPrice = 100.0; 
-let stockVolatilityModifier = 1.0; 
-let stockHistoryArray = [100.0, 98.5, 101.2, 103.0, 99.1, 102.4]; 
-let historicalCandlesticks = ['🟩 $102.40', '🟥 $99.10', '🟩 $103.00', '🟩 $101.20']; 
-
-// Track candle intervals
-let minuteHigh = 100.0;
-let minuteLow = 100.0;
-let minuteOpen = 100.0;
 
 // MULTI-CHOICE PREDICTION SYSTEM STATE
 let activePoll = null; 
@@ -86,7 +76,8 @@ const userSchema = new mongoose.Schema({
     hasBooster: { type: Boolean, default: false }, 
     customTitle: { type: String, default: null },   
     hasShield: { type: Boolean, default: false },
-    stocks: { type: Number, default: 0 } 
+    // Retained map structure so your future FlameStocks bot can link up to it natively
+    portfolios: { type: Map, of: Number, default: {} } 
 });
 
 const User = mongoose.model('User', userSchema);
@@ -114,6 +105,7 @@ async function getUser(id) {
             user = await User.findOne({ id });
         }
     }
+    if (!user.portfolios) user.portfolios = new Map();
     return user;
 }
 
@@ -181,40 +173,13 @@ if (MONGO_URI) {
 
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('FlameBot is online');
+    res.end('FlameBot Core is online');
 }).listen(PORT, () => {
     console.log(`🌐 Web server running on port ${PORT}`);
 });
 
 client.once('ready', () => {
-    console.log(`🔥 FlameBot logged in as ${client.user.tag}`);
-    
-    // AUTOMATED MINUTE TICK ENGINE MATRIX (Updates every 60 seconds)
-    setInterval(() => {
-        const varianceBase = (Math.random() * 4.9) + 0.1;
-        const changeVolume = varianceBase * stockVolatilityModifier;
-        const trendDirection = Math.random() > 0.48 ? 1 : -1; 
-        
-        const finalPriceAdjustment = changeVolume * trendDirection;
-        currentStockPrice = Math.max(1.0, parseFloat((currentStockPrice + finalPriceAdjustment).toFixed(2)));
-        
-        if (currentStockPrice > minuteHigh) minuteHigh = currentStockPrice;
-        if (currentStockPrice < minuteLow) minuteLow = currentStockPrice;
-        
-        const indicatorIcon = currentStockPrice >= minuteOpen ? '🟩' : '🟥';
-        const formattedCandleString = `${indicatorIcon} **Close:** $${currentStockPrice.toFixed(2)} *(High: $${minuteHigh.toFixed(2)} | Low: $${minuteLow.toFixed(2)})*`;
-        
-        historicalCandlesticks.unshift(formattedCandleString);
-        if (historicalCandlesticks.length > 8) historicalCandlesticks.pop();
-        
-        stockHistoryArray.unshift(currentStockPrice);
-        if (stockHistoryArray.length > 15) stockHistoryArray.pop();
-        
-        minuteOpen = currentStockPrice;
-        minuteHigh = currentStockPrice;
-        minuteLow = currentStockPrice;
-        
-    }, 60000);
+    console.log(`🔥 FlameBot Core logged in as ${client.user.tag}`);
 });
 
 client.on('guildMemberAdd', async member => {
@@ -232,22 +197,6 @@ client.on('guildMemberAdd', async member => {
 // ==========================================
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
-
-    // TARGETED CHAT MARKET SHIFT TRIGGER VECTOR
-    const streamIdentifierRoleNames = ['Owner/Streamer', 'RedFlame', 'Streamer'];
-    const isStreamerSpeaking = message.member.roles.cache.some(r => streamIdentifierRoleNames.includes(r.name)) || message.author.id === '1511458646348009573'; 
-
-    if (isStreamerSpeaking) {
-        if (Math.random() < 0.85) {
-            const hypePumpValue = parseFloat(((Math.random() * 4.0) + 1.0).toFixed(2)) * stockVolatilityModifier;
-            currentStockPrice = parseFloat((currentStockPrice + hypePumpValue).toFixed(2));
-            if (currentStockPrice > minuteHigh) minuteHigh = currentStockPrice;
-        } else {
-            const dynamicDipValue = parseFloat(((Math.random() * 2.0) + 0.1).toFixed(2)) * stockVolatilityModifier;
-            currentStockPrice = Math.max(1.0, parseFloat((currentStockPrice - dynamicDipValue).toFixed(2)));
-            if (currentStockPrice < minuteLow) minuteLow = currentStockPrice;
-        }
-    }
 
     const userData = await getUser(message.author.id);
 
@@ -420,7 +369,6 @@ client.on('messageCreate', async message => {
             .addFields(
                 { name: '🤖 AI Chat', value: '`!ask <question>`' },
                 { name: '🗳️ Predictions', value: '`!bet <choice_number> <amount>`' },
-                { name: '📈 Stream Market', value: '`!stock`, `!buystock <amount>`, `!sellstock <amount>`' },
                 { name: '🪙 Economy', value: '`!bal`, `!daily`, `!work`, `!pay @user <amount>`, `!leaderboard`, `!shop`, `!buy <item>`, `!rank`' },
                 { name: '🎰 Casino (30s Cooldown)', value: '`!blackjack <bet>`, `!coinflip <heads/tails> <bet>`, `!gamble slots/dice <bet>`, `!rob @user`' },
                 { name: '🎉 Fun', value: '`!8ball`, `!rps`, `!roll`, `!choose`, `!coin`, `!dice`, `!poll`, `!bananabread`' },
@@ -428,7 +376,7 @@ client.on('messageCreate', async message => {
                 { name: '📣 Utilities', value: '`!links`, `!suggest`, `!afk`, `!say`, `!announce`' },
                 { name: '🛡️ Staff Only', value: '`!staffhelp`' }
             )
-            .setFooter({ text: 'FlameBot | Version 1.7' })
+            .setFooter({ text: 'FlameBot | Version 1.8 (Core Edition)' })
             .setTimestamp();
 
         return message.channel.send({ embeds: [embed] });
@@ -441,8 +389,7 @@ client.on('messageCreate', async message => {
             .setColor('#2F3136')
             .setTitle('🛡️ Staff Command Directory')
             .addFields(
-                { name: '📺 Live Stream Feeds', value: '`!stream win [multiplier]`, `!stream loss [multiplier]`' },
-                { name: '📈 Market Controls', value: '`!setmodifier <multiplier>`, `!openpoll <item 1> | <item 2> | ...`, `!endpoll <winning_number>`' },
+                { name: '🗳️ Predictions Management', value: '`!openpoll <item 1> | <item 2> | ...`, `!endpoll <winning_number>`' },
                 { name: '⚠️ Moderation', value: '`!warn @user <reason>`, `!warnings @user`, `!clearwarns @user`, `!mute @user`, `!unmute @user`, `!tempmute @user <mins>`, `!kick @user [time] [reason]`, `!ban @user [time] [reason]`' },
                 { name: '🧹 Channel Controls', value: '`!clear <1-100>`, `!slowmode <seconds/off>`, `!lockchannel`, `!unlockchannel`' },
                 { name: '💰 Economy Admin', value: '`!addcoins @user <amount>`, `!removecoins @user <amount>`, `!setcoins @user <amount>`, `!resetcoins @user`, `!baltable`, `!approvesuggest <userId>`, `!rejectsuggest <userId> <reason>`' },
@@ -455,7 +402,6 @@ client.on('messageCreate', async message => {
     // ==========================================
     //      MULTI-CHOICE PREDICTION COMMANDS      
     // ==========================================
-
     if (command === '!openpoll') {
         if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
         
@@ -556,110 +502,6 @@ client.on('messageCreate', async message => {
         
         activePoll = null; 
         return;
-    }
-
-    // ==========================================
-    //       STREAM MARKET MODULE COMMANDS        
-    // ==========================================
-
-    if (command === '!stock') {
-        const chartLinesText = historicalCandlesticks.join('\n') || '*Awaiting minute interval logs validation...*';
-        
-        const marketEmbed = new EmbedBuilder()
-            .setColor(historicalCandlesticks[0]?.includes('🟩') ? '#00FF00' : '#FF0000')
-            .setTitle('📈 RedFlame Live Stream Stock Index ($FLME)')
-            .setDescription(`Real-time performance indicators linked directly to chat activity metrics.\n\n💵 **Current Value:** \`$${currentStockPrice.toFixed(2)} Flame Coins\`\n⚙️ **Active Volatility Modifier:** \`${stockVolatilityModifier.toFixed(1)}x\``)
-            .addFields(
-                { name: '📊 Historical Candlestick Stream Data (image_87350e.png Simulation)', value: `\`\`\`md\n${chartLinesText}\n\`\`\`` }
-            )
-            .setFooter({ text: 'Refreshes ticks automatically every 1 minute.' })
-            .setTimestamp();
-
-        return message.channel.send({ embeds: [marketEmbed] });
-    }
-
-    // STREAM OUTCOME FEED TRIGGERS
-    if (command === '!stream') {
-        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
-        
-        const action = args[1]?.toLowerCase();
-        const rawScale = args[2];
-        const intensityScale = rawScale ? (cleanFloat(rawScale) || 1.0) : 1.0;
-
-        if (!['win', 'loss', 'lose'].includes(action)) {
-            return message.reply('❌ Invalid reporting parameters. Usage: `!stream win [multiplier]` or `!stream loss [multiplier]`');
-        }
-
-        if (action === 'win') {
-            // Calculate a massive stock pump proportional to the multiplier scale passed
-            const basePump = (Math.random() * 15.0) + 10.0; // Pushes up between 10-25 coins baseline
-            const finalPumpValue = parseFloat((basePump * intensityScale * stockVolatilityModifier).toFixed(2));
-            
-            currentStockPrice = parseFloat((currentStockPrice + finalPumpValue).toFixed(2));
-            if (currentStockPrice > minuteHigh) minuteHigh = currentStockPrice;
-
-            // Instantly inject a forced green candlestick into historical arrays mimicking image_87350e.png properties
-            const injectedCandle = `🟩 **STREAM WIN PUMP:** $${currentStockPrice.toFixed(2)} *(+$${finalPumpValue.toFixed(2)})*`;
-            historicalCandlesticks.unshift(injectedCandle);
-            if (historicalCandlesticks.length > 8) historicalCandlesticks.pop();
-
-            return message.channel.send(`🚀 **MARKET PUMP:** Admins reported a live stream **VICTORY**! **$FLME** stock price has skyrocketed by **+$${finalPumpValue.toFixed(2)}**! New Price: \`$${currentStockPrice.toFixed(2)}\``);
-        }
-
-        if (action === 'loss' || action === 'lose') {
-            // Calculate a massive stock dump proportional to the multiplier scale passed
-            const baseDump = (Math.random() * 12.0) + 8.0; // Dumps between 8-20 coins baseline
-            const finalDumpValue = parseFloat((baseDump * intensityScale * stockVolatilityModifier).toFixed(2));
-            
-            currentStockPrice = Math.max(1.0, parseFloat((currentStockPrice - finalDumpValue).toFixed(2)));
-            if (currentStockPrice < minuteLow) minuteLow = currentStockPrice;
-
-            // Instantly inject a forced red candlestick into historical arrays mimicking image_87350e.png properties
-            const injectedCandle = `🟥 **STREAM CHOKE DUMP:** $${currentStockPrice.toFixed(2)} *(-$${finalDumpValue.toFixed(2)})*`;
-            historicalCandlesticks.unshift(injectedCandle);
-            if (historicalCandlesticks.length > 8) historicalCandlesticks.pop();
-
-            return message.channel.send(`📉 **MARKET CRASH:** Admins reported a live stream **LOSS / CHOKE**! **$FLME** stock values dropped hard by **-$${finalDumpValue.toFixed(2)}**! New Price: \`$${currentStockPrice.toFixed(2)}\``);
-        }
-    }
-
-    if (command === '!setmodifier' || command === '!setmultiplier') {
-        if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
-        const targetMod = cleanFloat(args[1]);
-        if (targetMod === null || targetMod < 0.0 || targetMod > 20.0) {
-            return message.reply('❌ Usage: `!setmodifier <0.1 - 20.0>`');
-        }
-
-        stockVolatilityModifier = targetMod;
-        return message.channel.send(`⚙️ **Market Parameter Alteration:** Volatility speed modifier locked down to **${stockVolatilityModifier.toFixed(1)}x** rate efficiency.`);
-    }
-
-    if (command === '!buystock') {
-        const sharesToBuy = cleanAmount(args[1]);
-        if (!sharesToBuy || sharesToBuy <= 0) return message.reply('❌ Usage: `!buystock <amount>`');
-
-        const totalCost = Math.ceil(sharesToBuy * currentStockPrice);
-        if (userData.coins < totalCost) return message.reply Atlantic(`❌ You don't have enough coins. Buying ${sharesToBuy} shares costs 🪙 **${totalCost} coins**.`);
-
-        userData.coins -= totalCost;
-        userData.stocks += sharesToBuy;
-        await userData.save();
-
-        return message.reply(`✅ **Purchase Confirmed:** You bought **${sharesToBuy}** shares of **$FLME** for 🪙 **${totalCost} coins**! (Total shares: ${userData.stocks})`);
-    }
-
-    if (command === '!sellstock') {
-        const sharesToSell = cleanAmount(args[1]);
-        if (!sharesToSell || sharesToSell <= 0) return message.reply('❌ Usage: `!sellstock <amount>`');
-
-        if (userData.stocks < sharesToSell) return message.reply(`❌ You only own **${userData.stocks}** shares of **$FLME**.`);
-
-        const totalPayout = Math.floor(sharesToSell * currentStockPrice);
-        userData.stocks -= sharesToSell;
-        userData.coins += totalPayout;
-        await userData.save();
-
-        return message.reply(`💸 **Sale Confirmed:** You sold **${sharesToSell}** shares of **$FLME** for 🪙 **+${totalPayout} coins**!`);
     }
 
     // ==========================================
@@ -852,7 +694,6 @@ client.on('messageCreate', async message => {
                     .setTitle(`👤 Profile Summary: ${target.user.username} ${data.customTitle ? data.customTitle : ''}`) 
                     .addFields(
                         { name: '🪙 Coins', value: `${data.coins}`, inline: true },
-                        { name: '📈 Owned Stocks', value: `${data.stocks} $FLME`, inline: true }, 
                         { name: '⭐ XP', value: `${data.xp}`, inline: true },
                         { name: '📈 Level', value: `${level}`, inline: true },
                         { name: '🛡️ Active Shield', value: data.hasShield ? '✅ Yes' : '❌ No', inline: true },
@@ -1087,7 +928,7 @@ client.on('messageCreate', async message => {
 
         const resolvedTargetUser = await client.users.fetch(targetedUserStringId).catch(() => null);
         if (resolvedTargetUser) {
-            await resolvedTargetUser.send suicide(`🎟️ **Proposal Approved:** An administrator reviewed and officially approved your suggestion inside **${message.guild.name}**! Thanks for your input.`).catch(() => {});
+            await resolvedTargetUser.send(`🎟️ **Proposal Approved:** An administrator reviewed and officially approved your suggestion inside **${message.guild.name}**! Thanks for your input.`).catch(() => {});
             return message.reply('✅ The user has been notified of their proposal approval.');
         }
         return message.reply('❌ Lookup Failure: Could not locate that user profile ID.');
@@ -1228,6 +1069,7 @@ client.on('messageCreate', async message => {
         return;
     }
 
+    // DISCIPLINARY EXPULSIONS
     if (command === '!kick') {
         if (!isMod(message.member)) return message.reply('❌ Requires Moderator or superior roles.');
 
@@ -1406,7 +1248,7 @@ client.on('messageCreate', async message => {
         await User.updateOne({ id: target.id }, { $set: { coins: 0 } }, { upsert: true });
         message.reply(`🧹 Account balance metrics cleared to zero baseline markers for user profile ${target.user.username}.`);
 
-        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#DCDCDC').setTitle('💰 Treasury System Audit Log: Balance Purge Authorized').addFields({ name: 'Responsible Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Reset Profile Identity', value: `<@${target.id}>`, inline: true }).setTimestamp();
+        const secretLedgerAuditLogsEmbed = new EmbedBuilder().setColor('#DCDCDC').setTitle('💰 Treasury System Audit Log: Balance Summary Purge Authorized').addFields({ name: 'Responsible Admin Executor', value: `<@${message.author.id}>`, inline: true }, { name: 'Target Reset Profile Identity', value: `<@${target.id}>`, inline: true }).setTimestamp();
         await dmServerLeadership(message.guild, secretLedgerAuditLogsEmbed);
         return;
     }
