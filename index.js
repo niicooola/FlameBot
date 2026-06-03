@@ -54,7 +54,7 @@ const lastDaily = {};
 const lastGambled = {};
 const lastRobbed = {};
 
-// HELPERS
+    // HELPERS
 async function getUser(id) {
     let user = await User.findOne({ id });
     if (!user) {
@@ -151,11 +151,12 @@ client.on('messageCreate', async message => {
     }
 
    // PASSIVE INCOME SYSTEM & SMART CONVERSATION TRIGGER
-    if (!message.content.startsWith(PREFIX)) {
-        userData.coins += CHAT_INCOME;
-        userData.xp += 2;
-        await userData.save();
+  const args = message.content.trim().split(/\s+/);
+    const command = args[0].toLowerCase();
 
+    userData.coins += CHAT_INCOME;
+    userData.xp += 5;
+    await userData.save();
         // Only look at messages that are at least a few words long to filter out spam/emojis
         if (message.content.trim().split(/\s+/).length >= 3) {
             try {
@@ -209,11 +210,24 @@ client.on('messageCreate', async message => {
         return;
     }
 
-    const args = message.content.trim().split(/\s+/);
+   const args = message.content.trim().split(/\s+/);
     const command = args[0].toLowerCase();
 
+    // Calculate level before adding command XP
+    const oldLevelCmd = Math.floor(0.1 * Math.sqrt(userData.xp));
+
     userData.coins += CHAT_INCOME;
-    userData.xp += 5;
+    userData.xp += 5; // Running a command gives +5 XP
+
+    // Calculate level after adding command XP
+    const newLevelCmd = Math.floor(0.1 * Math.sqrt(userData.xp));
+
+    if (newLevelCmd > oldLevelCmd) {
+        const coinPrizeCmd = 100 + (newLevelCmd * 50);
+        userData.coins += coinPrizeCmd;
+        message.channel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevelCmd}**!! Payout: 🪙 **+${coinPrizeCmd}** Flame Coins.`);
+    }
+
     await userData.save();
 
     // HELP
@@ -387,10 +401,10 @@ client.on('messageCreate', async message => {
         return message.reply(`🪙 You have **${userData.coins} Flame Coins**.`);
     }
 
-    if (command === '!stats') {
+   if (command === '!stats') {
         const target = message.mentions.members.first() || message.member;
         const data = await getUser(target.id);
-        const level = Math.floor(data.xp / 100);
+        const level = Math.floor(0.1 * Math.sqrt(data.xp));
 
         return message.channel.send({
             embeds: [
@@ -407,9 +421,12 @@ client.on('messageCreate', async message => {
         });
     }
 
-    if (command === '!rank') {
-        const level = Math.floor(userData.xp / 100);
-        return message.reply(`📈 Level **${level}** | XP **${userData.xp}**`);
+   if (command === '!rank') {
+        const level = Math.floor(0.1 * Math.sqrt(userData.xp));
+        const nextLevelXp = Math.pow((level + 1) / 0.1, 2);
+        const xpNeeded = Math.ceil(nextLevelXp - userData.xp);
+
+        return message.reply(`📈 Level **${level}** | XP **${userData.xp}** (Need **${xpNeeded}** more XP to level up!)`);
     }
 
     if (command === '!daily') {
