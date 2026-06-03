@@ -1,18 +1,8 @@
-client.on('messageCreate', async (message) => {
-    console.log(`Debug: I see a message from ${message.author.username}: ${message.content}`); // ADD THIS
-    if (message.author.bot || !message.guild) return;
-    // ... rest of your code
-});
 require('dotenv').config();
-process.on('uncaughtException', (err) => {
-  console.error('CRASHED! Error:', err);
-});
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
 const { Client, GatewayIntentBits, PermissionsBitField, EmbedBuilder } = require('discord.js');
 const { GoogleGenAI } = require('@google/genai');
 const mongoose = require('mongoose');
+const http = require('http');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers] });
 
@@ -28,31 +18,23 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_KEY });
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.guild) return;
 
-    // --- NEW INDESTRUCTIBLE LOGIC ---
-let user = await User.findOne({ id: message.author.id });
-if (!user) {
-    try {
-        user = await User.create({ id: message.author.id });
-    } catch (err) {
-        // If it still errors, it means the user was created exactly in the split second before this
-        user = await User.findOne({ id: message.author.id });
+    let user = await User.findOne({ id: message.author.id });
+    if (!user) {
+        try { user = await User.create({ id: message.author.id }); } 
+        catch (err) { user = await User.findOne({ id: message.author.id }); }
     }
-}
+
     user.coins += 5;
     await user.save();
 
     const args = message.content.split(' ');
     const cmd = args[0].toLowerCase();
-
-    // STAFF CHECK
     const isStaff = message.member.permissions.has(PermissionsBitField.Flags.Administrator) || message.member.roles.cache.some(r => ['Mod', 'Lower Admin', 'Admin'].includes(r.name));
 
-    // --- COMMAND MATRIX ---
-    
     // 1. AI & UTILITY
     if (cmd === '!ask') {
         const q = args.slice(1).join(' ');
-        const res = await ai.models.generateContent({ model: "gemini-2.5-flash", contents: q });
+        const res = await ai.models.generateContent({ model: "gemini-2.0-flash", contents: q });
         message.reply(res.text.substring(0, 2000));
     }
     else if (cmd === '!ping') message.reply(`Pong! ${Math.abs(Date.now() - message.createdTimestamp)}ms`);
@@ -64,6 +46,7 @@ if (!user) {
     else if (cmd === '!roll') message.reply(`Rolled: ${Math.floor(Math.random()*6)+1}`);
     else if (cmd === '!choose') message.reply(`Selection: ${args.slice(1).join(' ').split('|')[Math.floor(Math.random()*2)].trim()}`);
     else if (cmd === '!suggest') message.reply('Suggestion logged.');
+    else if (cmd === '!help') { /* Include your embed code here */ }
 
     // 2. ECONOMY & CASINO
     else if (cmd === '!bal') message.reply(`Balance: ${user.coins}`);
@@ -88,7 +71,7 @@ if (!user) {
         const t = message.mentions.members.first(); let tu = await User.findOne({id:t.id}); tu.warnings++; await tu.save(); message.reply('Warned!'); 
     }
     else if (cmd === '!warnings' && isStaff) { const t = message.mentions.members.first(); message.reply('Warnings: checking...'); }
-    else if (cmd === '!clearwarns' && isStaff) { /* Logic to reset */ }
+    else if (cmd === '!clearwarns' && isStaff) { /* Reset logic */ }
     else if (cmd === '!mute' && isStaff) message.reply('Muted.');
     else if (cmd === '!unmute' && isStaff) message.reply('Unmuted.');
     else if (cmd === '!tempmute' && isStaff) message.reply('Temp Muted.');
@@ -108,6 +91,5 @@ if (!user) {
     else if (cmd === '!golive' && isStaff) message.reply('Stream announced!');
 });
 
-const http = require('http');
 http.createServer((req, res) => res.end('FlameBot is online!')).listen(process.env.PORT || 3000);
 client.login(process.env.DISCORD_TOKEN);
