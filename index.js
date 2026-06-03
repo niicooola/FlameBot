@@ -54,7 +54,7 @@ const lastDaily = {};
 const lastGambled = {};
 const lastRobbed = {};
 
-    // HELPERS
+// HELPERS
 async function getUser(id) {
     let user = await User.findOne({ id });
     if (!user) {
@@ -133,14 +133,14 @@ client.on('messageCreate', async message => {
 
     const userData = await getUser(message.author.id);
 
-    // --- NEW: AFK RETURN CHECKER ---
+    // --- AFK RETURN CHECKER ---
     if (userData.afk) {
         userData.afk = null;
         await userData.save();
         message.reply('👋 Welcome back! I have removed your AFK status.').then(m => setTimeout(() => m.delete().catch(() => {}), 5000));
     }
 
-    // --- NEW: AFK MENTION CHECKER ---
+    // --- AFK MENTION CHECKER ---
     if (message.mentions.members.size > 0) {
         message.mentions.members.forEach(async (member) => {
             const mentionedData = await User.findOne({ id: member.id });
@@ -150,17 +150,33 @@ client.on('messageCreate', async message => {
         });
     }
 
-   // PASSIVE INCOME SYSTEM & SMART CONVERSATION TRIGGER
-  const args = message.content.trim().split(/\s+/);
-    const command = args[0].toLowerCase();
+    // --- PASSIVE INCOME SYSTEM & SMART CONVERSATION TRIGGER ---
+    if (!message.content.startsWith(PREFIX)) {
+        const oldLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
 
-    userData.coins += CHAT_INCOME;
-    userData.xp += 5;
-    await userData.save();
-        // Only look at messages that are at least a few words long to filter out spam/emojis
+        userData.coins += CHAT_INCOME;
+        userData.xp += 2; // Talking gives +2 XP
+
+        const newLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
+
+        // Level Up Alert
+        if (newLevel > oldLevel) {
+            const coinPrize = 100 + (newLevel * 50);
+            userData.coins += coinPrize;
+
+            const levelChannel = message.guild.channels.cache.get('1511569329949380668');
+            if (levelChannel) {
+                levelChannel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevel}**!! Payout: 🪙 **+${coinPrize}** Flame Coins.`);
+            } else {
+                message.channel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevel}**!! Payout: 🪙 **+${coinPrize}** Flame Coins.`);
+            }
+        }
+
+        await userData.save();
+
+        // Smart Talking Logic via Groq
         if (message.content.trim().split(/\s+/).length >= 3) {
             try {
-                // Step 1: Ask Groq if this message is a good conversational hook
                 const filterCompletion = await groq.chat.completions.create({
                     messages: [
                         {
@@ -170,15 +186,14 @@ client.on('messageCreate', async message => {
                         { role: 'user', content: message.content }
                     ],
                     model: 'llama-3.1-8b-instant',
-                    temperature: 0.1, // Low temperature keeps it strictly following the rules
+                    temperature: 0.1,
                     max_tokens: 10
                 });
 
                 const decision = filterCompletion.choices[0]?.message?.content?.trim().toUpperCase();
 
-                // Step 2: If Groq says "TRIGGER", roll a clean 30% chance to respond so it stays organic
                 if (decision.includes('TRIGGER')) {
-                    const CHANCE_PERCENT = 30; // 30% chance ensures it doesn't reply to literally EVERY question
+                    const CHANCE_PERCENT = 30;
                     const randomRoll = Math.floor(Math.random() * 100) + 1;
 
                     if (randomRoll <= CHANCE_PERCENT) {
@@ -199,7 +214,7 @@ client.on('messageCreate', async message => {
 
                         const replyText = replyCompletion.choices[0]?.message?.content;
                         if (replyText) {
-                            return message.reply(replyText); // Uses message.reply so it tethers directly to their comment
+                            return message.reply(replyText);
                         }
                     }
                 }
@@ -207,25 +222,30 @@ client.on('messageCreate', async message => {
                 console.error('Groq Smart Chat Error:', err);
             }
         }
-        return;
+        return; // Exits loop for regular chatter
     }
 
-   const args = message.content.trim().split(/\s+/);
+    // --- COMMAND ENGINE MATRIX ---
+    const args = message.content.trim().split(/\s+/);
     const command = args[0].toLowerCase();
 
-    // Calculate level before adding command XP
     const oldLevelCmd = Math.floor(0.1 * Math.sqrt(userData.xp));
 
     userData.coins += CHAT_INCOME;
-    userData.xp += 5; // Running a command gives +5 XP
+    userData.xp += 5; // Commands grant +5 XP
 
-    // Calculate level after adding command XP
     const newLevelCmd = Math.floor(0.1 * Math.sqrt(userData.xp));
 
     if (newLevelCmd > oldLevelCmd) {
         const coinPrizeCmd = 100 + (newLevelCmd * 50);
         userData.coins += coinPrizeCmd;
-        message.channel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevelCmd}**!! Payout: 🪙 **+${coinPrizeCmd}** Flame Coins.`);
+
+        const levelChannelCmd = message.guild.channels.cache.get('1511569329949380668');
+        if (levelChannelCmd) {
+            levelChannelCmd.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevelCmd}**!! Payout: 🪙 **+${coinPrizeCmd}** Flame Coins.`);
+        } else {
+            message.channel.send(`🎉 **LEVEL UP!** <@${message.author.id}> leveled up to **Level ${newLevelCmd}**!! Payout: 🪙 **+${coinPrizeCmd}** Flame Coins.`);
+        }
     }
 
     await userData.save();
@@ -401,7 +421,7 @@ client.on('messageCreate', async message => {
         return message.reply(`🪙 You have **${userData.coins} Flame Coins**.`);
     }
 
-   if (command === '!stats') {
+    if (command === '!stats') {
         const target = message.mentions.members.first() || message.member;
         const data = await getUser(target.id);
         const level = Math.floor(0.1 * Math.sqrt(data.xp));
@@ -421,7 +441,7 @@ client.on('messageCreate', async message => {
         });
     }
 
-   if (command === '!rank') {
+    if (command === '!rank') {
         const level = Math.floor(0.1 * Math.sqrt(userData.xp));
         const nextLevelXp = Math.pow((level + 1) / 0.1, 2);
         const xpNeeded = Math.ceil(nextLevelXp - userData.xp);
