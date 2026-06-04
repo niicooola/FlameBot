@@ -20,6 +20,7 @@ const marketTickersState = {
     }
 };
 
+// Generates a clean, single-row continuous line chart matching price height
 function renderTrendGraph(history) {
     const dataPoints = history.slice(-20);
     if (dataPoints.length === 0) return 'Processing Market Timeline...';
@@ -28,46 +29,22 @@ function renderTrendGraph(history) {
     const minVal = Math.min(...dataPoints);
     const spread = maxVal - minVal || 1;
 
-    const rowsCount = 10;
+    const rowsCount = 8; // Compact vertical grid height
     const colsCount = dataPoints.length;
 
-    // Initialize with empty spacing instead of old block dot arrays
     let grid = Array(rowsCount)
         .fill(null)
         .map(() => Array(colsCount).fill('   '));
 
     dataPoints.forEach((value, index) => {
-        // Find the scaled row position for the current price point
-        const currentScaledRow = Math.min(
+        const row = Math.min(
             rowsCount - 1,
             Math.floor(((maxVal - value) / spread) * (rowsCount - 1))
         );
-
-        if (index === 0) {
-            // First point always drops a flat line vector
-            grid[currentScaledRow][index] = ' ─ ';
-        } else {
-            const previousValue = dataPoints[index - 1];
-            const previousScaledRow = Math.min(
-                rowsCount - 1,
-                Math.floor(((maxVal - previousValue) / spread) * (rowsCount - 1))
-            );
-
-            // Determine line vector angles based on market direction
-            if (currentScaledRow < previousScaledRow) {
-                // Price pumped up (row index decreased)
-                grid[currentScaledRow][index] = ' ╱ ';
-            } else if (currentScaledRow > previousScaledRow) {
-                // Price dropped down (row index increased)
-                grid[currentScaledRow][index] = ' ╲ ';
-            } else {
-                // Price stayed perfectly consistent
-                grid[currentScaledRow][index] = ' ─ ';
-            }
-        }
+        // Uses a clean uniform line step character that doesn't split or gap
+        grid[row][index] = '───'; 
     });
 
-    // Maps rows out cleanly and joins lines down the timeline axis
     return grid.map(r => r.join('')).join('\n');
 }
 
@@ -83,7 +60,7 @@ async function renderMarketBoardEmbed() {
             `⚙️ Modifier: **${stock.modifier.toFixed(2)}x**`
         )
         .addFields({
-            name: '📊 Trend',
+            name: '📊 Trend Timeline',
             value:
                 '```' +
                 '\n' +
@@ -115,71 +92,64 @@ async function updateMarketBoard(client) {
         stock.history.shift();
     }
 
-    if (!MARKET_BOARD_CHANNEL_ID) {
-        return;
-    }
+    if (!MARKET_BOARD_CHANNEL_ID) return;
 
     try {
-        const channel =
-            await client.channels.fetch(MARKET_BOARD_CHANNEL_ID);
-
+        const channel = await client.channels.fetch(MARKET_BOARD_CHANNEL_ID);
         if (!channel) return;
 
         const embed = await renderMarketBoardEmbed();
 
+        // PERSISTENT 1-MESSAGE CACHE RECOVERY LOGIC
         if (!liveDisplayMessageInstance) {
-            liveDisplayMessageInstance =
-                await channel.send({
-                    embeds: [embed]
-                });
+            // Fetch the last 15 messages in the channel to see if the bot already has an active board up
+            const recentMessages = await channel.messages.fetch({ limit: 15 });
+            const oldBoardMessage = recentMessages.find(m => m.author.id === client.user.id && m.embeds.length > 0);
+
+            if (oldBoardMessage) {
+                // Lock onto the existing message instead of double-posting
+                liveDisplayMessageInstance = oldBoardMessage;
+                await liveDisplayMessageInstance.edit({ embeds: [embed] });
+            } else {
+                // If it's a completely blank channel, create the initial instance
+                liveDisplayMessageInstance = await channel.send({ embeds: [embed] });
+            }
         } else {
-            await liveDisplayMessageInstance.edit({
-                embeds: [embed]
-            });
+            // Standard 1-minute edit loop update call
+            await liveDisplayMessageInstance.edit({ embeds: [embed] });
         }
     } catch (err) {
-        console.error('Market board error:', err);
+        console.error('Market board loop error:', err);
     }
 }
 
 function startMarketLoop(client) {
-    updateMarketBoard(client);
+    // Delays first scan slightly to make sure Discord client cache fields are fully parsed on boot
+    setTimeout(() => {
+        updateMarketBoard(client);
+    }, 5000);
 
     setInterval(() => {
         updateMarketBoard(client);
     }, 60000);
 }
 
-async function handleMarket(
-    message,
-    args,
-    command,
-    userData
-) {
+async function handleMarket(message, args, command, userData) {
     if (command === '!market' || command === '!stock') {
         const embed = await renderMarketBoardEmbed();
-
-        await message.channel.send({
-            embeds: [embed]
-        });
-
+        await message.channel.send({ embeds: [embed] });
         return true;
     }
 
     if (command === '!portfolio') {
-        const shares =
-            userData.portfolios?.get('$FLME') || 0;
-
-        const value =
-            shares *
-            marketTickersState['$FLME'].price;
+        const shares = userData.portfolios?.get('$FLME') || 0;
+        const value = shares * marketTickersState['$FLME'].price;
 
         await message.reply(
             `📁 Portfolio\n` +
             `Shares: **${shares}**\n` +
             `Value: 🪙 **${Math.floor(value)}**`
         );
-
         return true;
     }
 
@@ -187,44 +157,25 @@ async function handleMarket(
         const ticker = args[1]?.toUpperCase();
         const amount = cleanAmount(args[2]);
 
-        if (
-            !VALID_TICKERS.includes(ticker) ||
-            !amount ||
-            amount <= 0
-        ) {
-            await message.reply(
-                '❌ Usage: !buyshares $FLME <amount>'
-            );
+        if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
+            await message.reply('❌ Usage: !buyshares $FLME <amount>');
             return true;
         }
 
-        const price =
-            marketTickersState[ticker].price;
-
+        const price = marketTickersState[ticker].price;
         const cost = Math.ceil(price * amount);
 
         if (userData.coins < cost) {
-            await message.reply(
-                `❌ Need 🪙 ${cost}`
-            );
+            await message.reply(`❌ Need 🪙 ${cost}`);
             return true;
         }
 
-        const current =
-            userData.portfolios.get(ticker) || 0;
-
+        const current = userData.portfolios.get(ticker) || 0;
         userData.coins -= cost;
-        userData.portfolios.set(
-            ticker,
-            current + amount
-        );
-
+        userData.portfolios.set(ticker, current + amount);
         await userData.save();
 
-        await message.reply(
-            `✅ Bought ${amount} ${ticker} shares for 🪙 ${cost}`
-        );
-
+        await message.reply(`✅ Bought ${amount} ${ticker} shares for 🪙 ${cost}`);
         return true;
     }
 
@@ -232,45 +183,23 @@ async function handleMarket(
         const ticker = args[1]?.toUpperCase();
         const amount = cleanAmount(args[2]);
 
-        if (
-            !VALID_TICKERS.includes(ticker) ||
-            !amount ||
-            amount <= 0
-        ) {
-            await message.reply(
-                '❌ Usage: !sellshares $FLME <amount>'
-            );
+        if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
+            await message.reply('❌ Usage: !sellshares $FLME <amount>');
             return true;
         }
 
-        const current =
-            userData.portfolios.get(ticker) || 0;
-
+        const current = userData.portfolios.get(ticker) || 0;
         if (current < amount) {
-            await message.reply(
-                '❌ Not enough shares.'
-            );
+            await message.reply('❌ Not enough shares.');
             return true;
         }
 
-        const payout = Math.floor(
-            marketTickersState[ticker].price *
-                amount
-        );
-
+        const payout = Math.floor(marketTickersState[ticker].price * amount);
         userData.coins += payout;
-
-        userData.portfolios.set(
-            ticker,
-            current - amount
-        );
-
+        userData.portfolios.set(ticker, current - amount);
         await userData.save();
 
-        await message.reply(
-            `✅ Sold ${amount} ${ticker} for 🪙 ${payout}`
-        );
-
+        await message.reply(`✅ Sold ${amount} ${ticker} for 🪙 ${payout}`);
         return true;
     }
 
