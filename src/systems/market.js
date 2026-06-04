@@ -25,7 +25,7 @@ async function renderMarketBoardEmbed() {
     const stock = marketTickersState['$FLME'];
 
     return new EmbedBuilder()
-        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000')
+        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000') // ◄ Color dynamically tracks the last interval cycle change
         .setTitle('📈 FlameBot Exchange')
         .setDescription(
             `**$FLME**\n` +
@@ -44,6 +44,9 @@ async function renderMarketBoardEmbed() {
 
 async function updateMarketBoard(client) {
     const stock = marketTickersState['$FLME'];
+
+    // 🛡️ FIX: Cache the old price as the absolute minute baseline BEFORE rolling the new movement tick
+    stock.minuteOpen = stock.price;
 
     const movement =
         (Math.random() * 5) *
