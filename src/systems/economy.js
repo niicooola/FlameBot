@@ -26,7 +26,7 @@ const ECON_SHOP = {
     },
     'vip': {
         name: '💎 Elite VIP Server Role Upgrade',
-        price: 25000, // Reduced from absolute hyperinflation down to an achievable flex tier
+        price: 25000, 
         description: 'Unlock permanent VIP status tier permissions, private channels, and chat color.'
     }
 };
@@ -114,7 +114,7 @@ async function handleEconomy(message, args, command, userData) {
     }
 
     // ==========================================
-    //          🛒 UTILITY SERVER SHOP           
+    //           🛒 UTILITY SERVER SHOP           
     // ==========================================
     if (command === '!shop') {
         let shopMenu = '🛒 **FlameBot Server Utility Shop**\n───────────────\n';
@@ -159,19 +159,49 @@ async function handleEconomy(message, args, command, userData) {
             }
         }
 
-        // Standard transaction tracking logic routing straight to MongoDB profile structures
-        if (!userData.inventory) {
-            userData.inventory = new Map();
+        // ─── SAFE TRANSACTIONS WITHOUT .GET() / .SET() ───
+        // Initialize inventory safely as a standard JavaScript object fallback
+        if (!userData.inventory || typeof userData.inventory.get === 'function') {
+            userData.inventory = {};
         }
 
-        const currentCount = userData.inventory.get(itemId) || 0;
-        
+        // Read and update the item count using standard object properties
+        const currentCount = userData.inventory[itemId] || 0;
         userData.coins -= item.price;
-        userData.inventory.set(itemId, currentCount + 1);
+        userData.inventory[itemId] = currentCount + 1;
         
+        // Explicitly tell Mongoose that the inventory object fields changed so it saves properly
+        userData.markModified('inventory');
         await userData.save();
 
         return message.reply(`✅ Successfully bought **${item.name}** for 🪙 **${item.price} coins**! Type \`!inv\` to view your tracking assets.`);
+    }
+
+    // ==========================================
+    //          🎒 INVENTORY DISPLAY VALUE        
+    // ==========================================
+    if (command === '!inv' || command === '!inventory') {
+        // Fallback check to prevent display crashes
+        if (!userData.inventory || typeof userData.inventory.get === 'function') {
+            userData.inventory = {};
+        }
+
+        let invDescription = '🎒 **Your FlameBot Assets Inventory**\n───────────────\n';
+        let hasItems = false;
+
+        for (const [itemId, count] of Object.entries(userData.inventory)) {
+            const itemDetails = ECON_SHOP[itemId];
+            if (itemDetails && count > 0) {
+                invDescription += `🔹 **${itemDetails.name}** x${count}\n📝 *${itemDetails.description}*\n\n`;
+                hasItems = true;
+            }
+        }
+
+        if (!hasItems) {
+            invDescription += '*Your inventory is completely empty, bro. Go check out the `!shop`!*';
+        }
+
+        return message.reply(invDescription);
     }
 
     return false;
