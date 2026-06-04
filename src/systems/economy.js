@@ -1,54 +1,92 @@
-const { EmbedBuilder } = require('discord.js');
+const User = require('../models/User');
+const { getUser } = require('../utils/getUser');
+const { cleanAmount } = require('../utils/amounts');
 
-async function handleHelp(message, args, command) {
-    if (command !== '!help') return false;
+const lastWorked = {};
+const lastDaily = {};
 
-    const page = args[1]?.toLowerCase();
+async function handleEconomy(message, args, command, userData) {
+    if (command === '!bal' || command === '!balance') {
+        const target = message.mentions.members.first();
 
-    const pages = {
-        economy: '`!bal`, `!daily`, `!work`, `!pay`, `!leaderboard`',
-        casino: '`!coinflip`, `!blackjack`, `!gamble`',
-        market: '`!market`, `!stock`, `!portfolio`, `!buyshares`, `!sellshares`',
-        fun: '`!8ball`, `!rps`, `!roll`, `!choose`, `!coin`, `!dice`, `!poll`, `!bananabread`',
-        info: '`!stats`, `!rank`, `!serverinfo`, `!whois`, `!avatar`, `!ping`, `!uptime`, `!botinfo`, `!membercount`, `!channelinfo`, `!links`',
-        shop: '`!shop`, `!buy`',
-        mod: '`!warn`, `!mute`, `!kick`, `!ban`, `!clear`, `!slowmode`, `!lockchannel`',
-        ai: '`!ask`',
-        profile: '`!profile`, `!setbio`, `!badges`, `!inventory`',
-        tasks: '`!todo`, `!notes`',
-        server: '`!rules`, `!roles`, `!serverlinks`, `!report`'
-    };
+        if (target) {
+            const targetData = await getUser(target.id);
+            return message.reply(`🔍 **${target.user.username}** has 🪙 **${targetData.coins}** coins.`);
+        }
 
-    if (page && pages[page]) {
-        return message.channel.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor('#FF4500')
-                    .setTitle(`🔥 FlameBot Help: ${page}`)
-                    .setDescription(pages[page])
-            ]
-        });
+        return message.reply(`🪙 You have **${userData.coins} coins**.`);
     }
 
-    return message.channel.send({
-        embeds: [
-            new EmbedBuilder()
-                .setColor('#FF4500')
-                .setTitle('🔥 FlameBot Commands')
-                .setDescription('Use `!help <category>` for details.')
-                .addFields(
-                    { name: '🪙 Economy', value: '`!help economy`', inline: true },
-                    { name: '🎰 Casino', value: '`!help casino`', inline: true },
-                    { name: '📈 Market', value: '`!help market`', inline: true },
-                    { name: '🎉 Fun', value: '`!help fun`', inline: true },
-                    { name: '📊 Info', value: '`!help info`', inline: true },
-                    { name: '🏪 Shop', value: '`!help shop`', inline: true },
-                    { name: '🛡️ Mod', value: '`!help mod`', inline: true },
-                    { name: '🤖 AI', value: '`!help ai`', inline: true },
-                    { name: '👤 Profile', value: '`!help profile`', inline: true }
-                )
-        ]
-    });
+    if (command === '!daily') {
+        const now = Date.now();
+
+        if (lastDaily[message.author.id] && now - lastDaily[message.author.id] < 86400000) {
+            return message.reply('❌ You already claimed daily today.');
+        }
+
+        userData.coins += 100;
+        lastDaily[message.author.id] = now;
+        await userData.save();
+
+        return message.reply('📆 Daily claimed. 🪙 **+100 coins**');
+    }
+
+    if (command === '!work') {
+        const now = Date.now();
+
+        if (lastWorked[message.author.id] && now - lastWorked[message.author.id] < 3600000) {
+            return message.reply('❌ Work is on cooldown.');
+        }
+
+        const pay = Math.floor(Math.random() * 101) + 50;
+
+        userData.coins += pay;
+        lastWorked[message.author.id] = now;
+        await userData.save();
+
+        return message.reply(`💼 Work complete. Earned 🪙 **${pay} coins**.`);
+    }
+
+    if (command === '!pay') {
+        const target = message.mentions.members.first();
+        const amount = cleanAmount(args[2]);
+
+        if (!target || !amount || amount <= 0) {
+            return message.reply('❌ Usage: `!pay @user <amount>`');
+        }
+
+        if (target.id === message.author.id) {
+            return message.reply('❌ You cannot pay yourself.');
+        }
+
+        if (userData.coins < amount) {
+            return message.reply('❌ Not enough coins.');
+        }
+
+        const targetData = await getUser(target.id);
+
+        userData.coins -= amount;
+        targetData.coins += amount;
+
+        await userData.save();
+        await targetData.save();
+
+        return message.reply(`💸 Sent 🪙 **${amount} coins** to **${target.user.username}**.`);
+    }
+
+    if (command === '!leaderboard' || command === '!lb') {
+        const topUsers = await User.find().sort({ coins: -1 }).limit(10);
+
+        const lines = topUsers.map((u, i) => {
+            return `**#${i + 1}** <@${u.id}> — 🪙 ${u.coins}`;
+        }).join('\n') || 'No users yet.';
+
+        return message.channel.send(`🏆 **Leaderboard**\n${lines}`);
+    }
+
+    return false;
 }
 
-module.exports = { handleHelp };
+module.exports = {
+    handleEconomy
+};
