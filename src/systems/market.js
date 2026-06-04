@@ -254,3 +254,4 @@ module.exports = {
     pumpMarketOnChat,
     marketTickersState
 };
+// the secret factor is that everytime flame messages in chat the stock goes up \\
