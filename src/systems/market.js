@@ -22,52 +22,54 @@ const marketTickersState = {
 
 function renderTrendGraph(history) {
     const dataPoints = history.slice(-20);
+    if (dataPoints.length === 0) return 'Processing Market Timeline...';
 
     const maxVal = Math.max(...dataPoints);
     const minVal = Math.min(...dataPoints);
-
     const spread = maxVal - minVal || 1;
 
-    const grid = Array(10)
+    const rowsCount = 10;
+    const colsCount = dataPoints.length;
+
+    // Initialize with smooth spacing spaces instead of dot arrays
+    let grid = Array(rowsCount)
         .fill(null)
-        .map(() => Array(20).fill('·'));
+        .map(() => Array(colsCount).fill('   '));
 
     dataPoints.forEach((value, index) => {
-        const row = Math.floor(
-            ((maxVal - value) / spread) * 9
+        // Find the scaled row position for the current price point
+        const currentScaledRow = Math.min(
+            rowsCount - 1,
+            Math.floor(((maxVal - value) / spread) * (rowsCount - 1))
         );
 
-        grid[Math.min(9, row)][index] = '█';
+        if (index === 0) {
+            // First point always drops a flat line vector
+            grid[currentScaledRow][index] = ' ─ ';
+        } else {
+            const previousValue = dataPoints[index - 1];
+            const previousScaledRow = Math.min(
+                rowsCount - 1,
+                Math.floor(((maxVal - previousValue) / spread) * (rowsCount - 1))
+            );
+
+            // Determine line vector angles based on market direction
+            if (currentScaledRow < previousScaledRow) {
+                // Price pumped up (row index decreased)
+                grid[currentScaledRow][index] = ' ╱ ';
+            } else if (currentScaledRow > previousScaledRow) {
+                // Price dropped down (row index increased)
+                grid[currentScaledRow][index] = ' ╲ ';
+            } else {
+                // Price stayed perfectly consistent
+                grid[currentScaledRow][index] = ' ─ ';
+            }
+        }
     });
 
-    return grid.map(r => r.join(' ')).join('\n');
+    // Maps rows out cleanly and joins lines together down the timeline axis
+    return grid.map(r => r.join('')).join('\n');
 }
-
-async function renderMarketBoardEmbed() {
-    const stock = marketTickersState['$FLME'];
-
-    return new EmbedBuilder()
-        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000')
-        .setTitle('📈 FlameBot Exchange')
-        .setDescription(
-            `**$FLME**\n` +
-            `💰 Price: **$${stock.price.toFixed(2)}**\n` +
-            `⚙️ Modifier: **${stock.modifier.toFixed(2)}x**`
-        )
-        .addFields({
-            name: '📊 Trend',
-            value:
-                '```' +
-                '\n' +
-                renderTrendGraph(stock.history) +
-                '\n```'
-        })
-        .setFooter({
-            text: '!market | !portfolio | !buyshares | !sellshares'
-        })
-        .setTimestamp();
-}
-
 async function updateMarketBoard(client) {
     const stock = marketTickersState['$FLME'];
 
