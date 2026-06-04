@@ -6,7 +6,7 @@ const { handleHelp } = require('../systems/help');
 const { handlePolls } = require('../systems/polls');
 const { handleEconomy } = require('../systems/economy');
 const { handleCasino } = require('../systems/casino');
-const { handleMarket, pumpMarketOnChat } = require('../systems/market'); // ◄ Fixed: Extracted pump hook!
+const { handleMarket } = require('../systems/market'); // ◄ Restored to standard import
 const { handleFun } = require('../systems/fun');
 const { handleInfo } = require('../systems/info');
 const { handleShop } = require('../systems/shop');
@@ -53,12 +53,6 @@ module.exports = function(client) {
     client.on('messageCreate', async message => {
         try {
             if (message.author.bot || !message.guild) return;
-
-            // ─── ⚡ MARKET MANIPULATION HOOK ───
-            // Intercepts messages from his ID to trigger the stock price spike instantly
-            if (message.author.id === '379092432614064128') {
-                await pumpMarketOnChat(client).catch(err => console.error('Market pump error:', err));
-            }
 
             const userData = await getUser(message.author.id);
 
