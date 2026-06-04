@@ -20,32 +20,32 @@ const marketTickersState = {
     }
 };
 
-// Generates a clean, single-row continuous line chart matching price height
+// Generates an unbreakable, single fluid line vector using progression blocks
 function renderTrendGraph(history) {
-    const dataPoints = history.slice(-20);
+    const dataPoints = history.slice(-20); // Track last 20 ticks
     if (dataPoints.length === 0) return 'Processing Market Timeline...';
 
     const maxVal = Math.max(...dataPoints);
     const minVal = Math.min(...dataPoints);
     const spread = maxVal - minVal || 1;
 
-    const rowsCount = 8; // Compact vertical grid height
-    const colsCount = dataPoints.length;
+    // Unicode sparkline characters from lowest to highest value tier
+    const sparkChars = [' ', ' ', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
-    let grid = Array(rowsCount)
-        .fill(null)
-        .map(() => Array(colsCount).fill('   '));
-
-    dataPoints.forEach((value, index) => {
-        const row = Math.min(
-            rowsCount - 1,
-            Math.floor(((maxVal - value) / spread) * (rowsCount - 1))
-        );
-        // Uses a clean uniform line step character that doesn't split or gap
-        grid[row][index] = '───'; 
+    let sparkline = '';
+    dataPoints.forEach((value) => {
+        // Calculate which tier the value falls into relative to the max/min spread
+        const ratio = (value - minVal) / spread;
+        const charIndex = Math.min(sparkChars.length - 1, Math.floor(ratio * (sparkChars.length - 1)));
+        sparkline += sparkChars[charIndex];
     });
 
-    return grid.map(r => r.join('')).join('\n');
+    // Add a trailing text visualizer to give direction context
+    const currentPrice = dataPoints[dataPoints.length - 1];
+    const prevPrice = dataPoints[dataPoints.length - 2] || currentPrice;
+    const directionIndicator = currentPrice >= prevPrice ? '📈' : '📉';
+
+    return `${sparkline} ${directionIndicator}`;
 }
 
 async function renderMarketBoardEmbed() {
@@ -60,7 +60,7 @@ async function renderMarketBoardEmbed() {
             `⚙️ Modifier: **${stock.modifier.toFixed(2)}x**`
         )
         .addFields({
-            name: '📊 Trend Timeline',
+            name: '📊 20-Min Trend Line',
             value:
                 '```' +
                 '\n' +
@@ -102,20 +102,16 @@ async function updateMarketBoard(client) {
 
         // PERSISTENT 1-MESSAGE CACHE RECOVERY LOGIC
         if (!liveDisplayMessageInstance) {
-            // Fetch the last 15 messages in the channel to see if the bot already has an active board up
             const recentMessages = await channel.messages.fetch({ limit: 15 });
             const oldBoardMessage = recentMessages.find(m => m.author.id === client.user.id && m.embeds.length > 0);
 
             if (oldBoardMessage) {
-                // Lock onto the existing message instead of double-posting
                 liveDisplayMessageInstance = oldBoardMessage;
                 await liveDisplayMessageInstance.edit({ embeds: [embed] });
             } else {
-                // If it's a completely blank channel, create the initial instance
                 liveDisplayMessageInstance = await channel.send({ embeds: [embed] });
             }
         } else {
-            // Standard 1-minute edit loop update call
             await liveDisplayMessageInstance.edit({ embeds: [embed] });
         }
     } catch (err) {
@@ -124,7 +120,6 @@ async function updateMarketBoard(client) {
 }
 
 function startMarketLoop(client) {
-    // Delays first scan slightly to make sure Discord client cache fields are fully parsed on boot
     setTimeout(() => {
         updateMarketBoard(client);
     }, 5000);
