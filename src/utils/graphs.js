@@ -1,7 +1,7 @@
 /**
  * Renders a mathematically synchronized text-based trend graph matrix.
  */
-function renderTrendGraph(history, maxPoints = 15, rowsCount = 6) {
+function renderTrendGraph(history, maxPoints = 14, rowsCount = 6) {
     const dataPoints = history.slice(-maxPoints); 
     if (dataPoints.length === 0) return 'Processing Market Timeline...';
 
