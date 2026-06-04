@@ -20,44 +20,40 @@ const marketTickersState = {
     }
 };
 
-// High-resolution grid charting system with explicit X/Y labeled data frames
 function renderTrendGraph(history) {
-    const dataPoints = history.slice(-15); // Spread out by tracking last 15 ticks instead of 20
+    const dataPoints = history.slice(-15); // Track last 15 intervals
     if (dataPoints.length === 0) return 'Processing Market Timeline...';
 
     const maxVal = Math.max(...dataPoints);
     const minVal = Math.min(...dataPoints);
     const spread = maxVal - minVal || 1;
 
-    const rowsCount = 7; // Clean, readable vertical height step
+    const rowsCount = 6; 
     const colsCount = dataPoints.length;
 
-    // Use a clean spacing dot to define the grid field surface map
+    // Standardized spacing dot to guarantee perfect monospace alignment across platforms
     let grid = Array(rowsCount)
         .fill(null)
-        .map(() => Array(colsCount).fill(' · '));
+        .map(() => Array(colsCount).fill(' . '));
 
     dataPoints.forEach((value, index) => {
         const row = Math.min(
             rowsCount - 1,
             Math.floor(((maxVal - value) / spread) * (rowsCount - 1))
         );
-        // Clean, bold marker plot point that stands out natively
-        grid[row][index] = ' ■ '; 
+        // Clean, standard character plot point that perfectly matches dot widths
+        grid[row][index] = ' o '; 
     });
 
     let textOutput = '';
     for (let r = 0; r < rowsCount; r++) {
-        // Calculate the exact price point tracking each horizontal line grid level
         const labelPrice = maxVal - ((r / (rowsCount - 1)) * spread);
         textOutput += `$${labelPrice.toFixed(1).padEnd(6)} │${grid[r].join('')}\n`;
     }
 
-    // Add continuous baseline axis grid framing border lines
-    textOutput += `${' '.padEnd(7)}└──${'═══'.repeat(colsCount)}\n`;
-    
-    // X-Axis mapping layout labels spaced out precisely under plot tracks
-    textOutput += `${' '.padEnd(9)}${dataPoints.map((_, i) => `t-${colsCount - i}`.padEnd(3)).join(' ')}\n`;
+    // Fixed compact X-Axis timeline bar that never wraps or stretches lines out of bounds
+    textOutput += `${' '.padEnd(7)}└───${'───'.repeat(colsCount)}\n`;
+    textOutput += `${' '.padEnd(9)}20m ago ─────────────────────► Live\n`;
 
     return textOutput;
 }
