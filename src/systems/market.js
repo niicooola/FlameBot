@@ -1,126 +1,255 @@
+const { EmbedBuilder } = require('discord.js');
+const { MARKET_BOARD_CHANNEL_ID } = require('../config');
 const { cleanAmount } = require('../utils/amounts');
-const { CASINO_COOLDOWN } = require('../config');
 
-const lastGambled = {};
+const VALID_TICKERS = ['$FLME'];
 
-async function handleCasino(message, args, command, userData) {
-    if (!['!coinflip', '!cf', '!blackjack', '!bj', '!gamble'].includes(command)) return false;
+let liveDisplayMessageInstance = null;
 
-    const now = Date.now();
+const marketTickersState = {
+    '$FLME': {
+        price: 100,
+        modifier: 1,
+        history: [
+            100, 99, 101, 102, 98,
+            103, 104, 102, 105, 107,
+            106, 108, 107, 109, 110,
+            108, 111, 109, 112, 110
+        ],
+        minuteOpen: 100
+    }
+};
 
-    if (lastGambled[message.author.id] && now - lastGambled[message.author.id] < CASINO_COOLDOWN) {
-        const left = Math.ceil((CASINO_COOLDOWN - (now - lastGambled[message.author.id])) / 1000);
-        return message.reply(`❌ Casino cooldown. Wait **${left}s**.`);
+function renderTrendGraph(history) {
+    const dataPoints = history.slice(-20);
+
+    const maxVal = Math.max(...dataPoints);
+    const minVal = Math.min(...dataPoints);
+
+    const spread = maxVal - minVal || 1;
+
+    const grid = Array(10)
+        .fill(null)
+        .map(() => Array(20).fill('·'));
+
+    dataPoints.forEach((value, index) => {
+        const row = Math.floor(
+            ((maxVal - value) / spread) * 9
+        );
+
+        grid[Math.min(9, row)][index] = '█';
+    });
+
+    return grid.map(r => r.join(' ')).join('\n');
+}
+
+async function renderMarketBoardEmbed() {
+    const stock = marketTickersState['$FLME'];
+
+    return new EmbedBuilder()
+        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000')
+        .setTitle('📈 FlameBot Exchange')
+        .setDescription(
+            `**$FLME**\n` +
+            `💰 Price: **$${stock.price.toFixed(2)}**\n` +
+            `⚙️ Modifier: **${stock.modifier.toFixed(2)}x**`
+        )
+        .addFields({
+            name: '📊 Trend',
+            value:
+                '```' +
+                '\n' +
+                renderTrendGraph(stock.history) +
+                '\n```'
+        })
+        .setFooter({
+            text: '!market | !portfolio | !buyshares | !sellshares'
+        })
+        .setTimestamp();
+}
+
+async function updateMarketBoard(client) {
+    const stock = marketTickersState['$FLME'];
+
+    const movement =
+        (Math.random() * 5) *
+        stock.modifier *
+        (Math.random() > 0.5 ? 1 : -1);
+
+    stock.price = Math.max(
+        1,
+        parseFloat((stock.price + movement).toFixed(2))
+    );
+
+    stock.history.push(stock.price);
+
+    if (stock.history.length > 25) {
+        stock.history.shift();
     }
 
-    if (command === '!coinflip' || command === '!cf') {
-        const side = args[1]?.toLowerCase();
-        const bet = cleanAmount(args[2]);
-
-        if (!['heads', 'tails'].includes(side) || !bet || bet <= 0) {
-            return message.reply('❌ Usage: `!coinflip <heads/tails> <bet>`');
-        }
-
-        if (userData.coins < bet) return message.reply('❌ Not enough coins.');
-
-        lastGambled[message.author.id] = now;
-
-        const result = Math.random() < 0.5 ? 'heads' : 'tails';
-
-        if (side === result) {
-            userData.coins += bet;
-            await userData.save();
-            return message.reply(`🪙 Landed **${result}**. You won **${bet} coins**.`);
-        }
-
-        userData.coins -= bet;
-        await userData.save();
-        return message.reply(`🪙 Landed **${result}**. You lost **${bet} coins**.`);
+    if (!MARKET_BOARD_CHANNEL_ID) {
+        return;
     }
 
-    if (command === '!blackjack' || command === '!bj') {
-        const bet = cleanAmount(args[1]);
+    try {
+        const channel =
+            await client.channels.fetch(MARKET_BOARD_CHANNEL_ID);
 
-        if (!bet || bet <= 0) return message.reply('❌ Usage: `!blackjack <bet>`');
-        if (userData.coins < bet) return message.reply('❌ Not enough coins.');
+        if (!channel) return;
 
-        lastGambled[message.author.id] = now;
+        const embed = await renderMarketBoardEmbed();
 
-        const player = Math.floor(Math.random() * 10) + 12;
-        const dealer = Math.floor(Math.random() * 10) + 12;
-
-        if (dealer > 21 || player > dealer) {
-            userData.coins += bet;
-            await userData.save();
-            return message.reply(`🃏 You: **${player}** | Dealer: **${dealer}**. You won **${bet} coins**.`);
+        if (!liveDisplayMessageInstance) {
+            liveDisplayMessageInstance =
+                await channel.send({
+                    embeds: [embed]
+                });
+        } else {
+            await liveDisplayMessageInstance.edit({
+                embeds: [embed]
+            });
         }
+    } catch (err) {
+        console.error('Market board error:', err);
+    }
+}
 
-        if (player === dealer) {
-            return message.reply(`🃏 Push. Both got **${player}**.`);
-        }
+function startMarketLoop(client) {
+    updateMarketBoard(client);
 
-        userData.coins -= bet;
-        await userData.save();
-        return message.reply(`🃏 You: **${player}** | Dealer: **${dealer}**. You lost **${bet} coins**.`);
+    setInterval(() => {
+        updateMarketBoard(client);
+    }, 60000);
+}
+
+async function handleMarket(
+    message,
+    args,
+    command,
+    userData
+) {
+    if (command === '!market' || command === '!stock') {
+        const embed = await renderMarketBoardEmbed();
+
+        await message.channel.send({
+            embeds: [embed]
+        });
+
+        return true;
     }
 
-    if (command === '!gamble') {
-        const mode = args[1]?.toLowerCase();
-        const bet = cleanAmount(args[2]);
+    if (command === '!portfolio') {
+        const shares =
+            userData.portfolios?.get('$FLME') || 0;
 
-        if (!['slots', 'dice'].includes(mode) || !bet || bet <= 0) {
-            return message.reply('❌ Usage: `!gamble <slots/dice> <bet>`');
+        const value =
+            shares *
+            marketTickersState['$FLME'].price;
+
+        await message.reply(
+            `📁 Portfolio\n` +
+            `Shares: **${shares}**\n` +
+            `Value: 🪙 **${Math.floor(value)}**`
+        );
+
+        return true;
+    }
+
+    if (command === '!buyshares') {
+        const ticker = args[1]?.toUpperCase();
+        const amount = cleanAmount(args[2]);
+
+        if (
+            !VALID_TICKERS.includes(ticker) ||
+            !amount ||
+            amount <= 0
+        ) {
+            await message.reply(
+                '❌ Usage: !buyshares $FLME <amount>'
+            );
+            return true;
         }
 
-        if (userData.coins < bet) return message.reply('❌ Not enough coins.');
+        const price =
+            marketTickersState[ticker].price;
 
-        lastGambled[message.author.id] = now;
+        const cost = Math.ceil(price * amount);
 
-        if (mode === 'dice') {
-            const userRoll = Math.floor(Math.random() * 6) + 1;
-            const botRoll = Math.floor(Math.random() * 6) + 1;
-
-            if (userRoll > botRoll) {
-                userData.coins += bet;
-                await userData.save();
-                return message.reply(`🎲 You rolled **${userRoll}**, bot rolled **${botRoll}**. Won **${bet} coins**.`);
-            }
-
-            if (userRoll === botRoll) {
-                return message.reply(`🎲 Draw. Both rolled **${userRoll}**.`);
-            }
-
-            userData.coins -= bet;
-            await userData.save();
-            return message.reply(`🎲 You rolled **${userRoll}**, bot rolled **${botRoll}**. Lost **${bet} coins**.`);
+        if (userData.coins < cost) {
+            await message.reply(
+                `❌ Need 🪙 ${cost}`
+            );
+            return true;
         }
 
-        const symbols = ['🍒', '🍋', '🍇', '💎', '🔥'];
-        const s1 = symbols[Math.floor(Math.random() * symbols.length)];
-        const s2 = symbols[Math.floor(Math.random() * symbols.length)];
-        const s3 = symbols[Math.floor(Math.random() * symbols.length)];
-        const visual = `[ ${s1} | ${s2} | ${s3} ]`;
+        const current =
+            userData.portfolios.get(ticker) || 0;
 
-        if (s1 === s2 && s2 === s3) {
-            const payout = bet * 4;
-            userData.coins += payout;
-            await userData.save();
-            return message.reply(`🎰 ${visual} Jackpot. Won **${payout} coins**.`);
-        }
+        userData.coins -= cost;
+        userData.portfolios.set(
+            ticker,
+            current + amount
+        );
 
-        if (s1 === s2 || s2 === s3 || s1 === s3) {
-            const payout = Math.floor(bet * 1.5);
-            userData.coins += payout;
-            await userData.save();
-            return message.reply(`🎰 ${visual} Match. Won **${payout} coins**.`);
-        }
-
-        userData.coins -= bet;
         await userData.save();
-        return message.reply(`🎰 ${visual} No match. Lost **${bet} coins**.`);
+
+        await message.reply(
+            `✅ Bought ${amount} ${ticker} shares for 🪙 ${cost}`
+        );
+
+        return true;
+    }
+
+    if (command === '!sellshares') {
+        const ticker = args[1]?.toUpperCase();
+        const amount = cleanAmount(args[2]);
+
+        if (
+            !VALID_TICKERS.includes(ticker) ||
+            !amount ||
+            amount <= 0
+        ) {
+            await message.reply(
+                '❌ Usage: !sellshares $FLME <amount>'
+            );
+            return true;
+        }
+
+        const current =
+            userData.portfolios.get(ticker) || 0;
+
+        if (current < amount) {
+            await message.reply(
+                '❌ Not enough shares.'
+            );
+            return true;
+        }
+
+        const payout = Math.floor(
+            marketTickersState[ticker].price *
+                amount
+        );
+
+        userData.coins += payout;
+
+        userData.portfolios.set(
+            ticker,
+            current - amount
+        );
+
+        await userData.save();
+
+        await message.reply(
+            `✅ Sold ${amount} ${ticker} for 🪙 ${payout}`
+        );
+
+        return true;
     }
 
     return false;
 }
 
-module.exports = { handleCasino };
+module.exports = {
+    handleMarket,
+    startMarketLoop
+};
