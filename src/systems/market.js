@@ -21,7 +21,7 @@ const marketTickersState = {
 };
 
 function renderTrendGraph(history) {
-    const dataPoints = history.slice(-15); // Track last 15 intervals
+    const dataPoints = history.slice(-15); 
     if (dataPoints.length === 0) return 'Processing Market Timeline...';
 
     const maxVal = Math.max(...dataPoints);
@@ -31,7 +31,6 @@ function renderTrendGraph(history) {
     const rowsCount = 6; 
     const colsCount = dataPoints.length;
 
-    // Standardized spacing dot to guarantee perfect monospace alignment across platforms
     let grid = Array(rowsCount)
         .fill(null)
         .map(() => Array(colsCount).fill(' . '));
@@ -41,7 +40,6 @@ function renderTrendGraph(history) {
             rowsCount - 1,
             Math.floor(((maxVal - value) / spread) * (rowsCount - 1))
         );
-        // Clean, standard character plot point that perfectly matches dot widths
         grid[row][index] = ' o '; 
     });
 
@@ -51,7 +49,6 @@ function renderTrendGraph(history) {
         textOutput += `$${labelPrice.toFixed(1).padEnd(6)} │${grid[r].join('')}\n`;
     }
 
-    // Fixed compact X-Axis timeline bar that never wraps or stretches lines out of bounds
     textOutput += `${' '.padEnd(7)}└───${'───'.repeat(colsCount)}\n`;
     textOutput += `${' '.padEnd(9)}20m ago ─────────────────────► Live\n`;
 
@@ -75,7 +72,8 @@ async function renderMarketBoardEmbed() {
                 '```' +
                 '\n' +
                 renderTrendGraph(stock.history) +
-                '\n```'
+                '\n
+```'
         })
         .setFooter({
             text: '!market | !portfolio | !buyshares | !sellshares'
@@ -146,7 +144,9 @@ async function handleMarket(message, args, command, userData) {
     }
 
     if (command === '!portfolio') {
-        const shares = userData.portfolios?.get('$FLME') || 0;
+        // MONGOOSE FIX: Strip the "$" when looking up the database map key
+        const dbKey = 'FLME';
+        const shares = userData.portfolios?.get(dbKey) || 0;
         const value = shares * marketTickersState['$FLME'].price;
 
         await message.reply(
@@ -174,9 +174,12 @@ async function handleMarket(message, args, command, userData) {
             return true;
         }
 
-        const current = userData.portfolios.get(ticker) || 0;
+        // MONGOOSE FIX: Strip the "$" before saving to the Map
+        const dbKey = ticker.replace('$', '');
+        const current = userData.portfolios.get(dbKey) || 0;
+        
         userData.coins -= cost;
-        userData.portfolios.set(ticker, current + amount);
+        userData.portfolios.set(dbKey, current + amount);
         await userData.save();
 
         await message.reply(`✅ Bought ${amount} ${ticker} shares for 🪙 ${cost}`);
@@ -192,7 +195,9 @@ async function handleMarket(message, args, command, userData) {
             return true;
         }
 
-        const current = userData.portfolios.get(ticker) || 0;
+        // MONGOOSE FIX: Strip the "$" before fetching from the Map
+        const dbKey = ticker.replace('$', '');
+        const current = userData.portfolios.get(dbKey) || 0;
         if (current < amount) {
             await message.reply('❌ Not enough shares.');
             return true;
@@ -200,7 +205,7 @@ async function handleMarket(message, args, command, userData) {
 
         const payout = Math.floor(marketTickersState[ticker].price * amount);
         userData.coins += payout;
-        userData.portfolios.set(ticker, current - amount);
+        userData.portfolios.set(dbKey, current - amount);
         await userData.save();
 
         await message.reply(`✅ Sold ${amount} ${ticker} for 🪙 ${payout}`);
@@ -212,5 +217,6 @@ async function handleMarket(message, args, command, userData) {
 
 module.exports = {
     handleMarket,
-    startMarketLoop
+    startMarketLoop,
+    marketTickersState
 };
