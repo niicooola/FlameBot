@@ -31,7 +31,7 @@ function renderTrendGraph(history) {
     const rowsCount = 10;
     const colsCount = dataPoints.length;
 
-    // Initialize with smooth spacing spaces instead of dot arrays
+    // Initialize with empty spacing instead of old block dot arrays
     let grid = Array(rowsCount)
         .fill(null)
         .map(() => Array(colsCount).fill('   '));
@@ -67,9 +67,35 @@ function renderTrendGraph(history) {
         }
     });
 
-    // Maps rows out cleanly and joins lines together down the timeline axis
+    // Maps rows out cleanly and joins lines down the timeline axis
     return grid.map(r => r.join('')).join('\n');
 }
+
+async function renderMarketBoardEmbed() {
+    const stock = marketTickersState['$FLME'];
+
+    return new EmbedBuilder()
+        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000')
+        .setTitle('📈 FlameBot Exchange')
+        .setDescription(
+            `**$FLME**\n` +
+            `💰 Price: **$${stock.price.toFixed(2)}**\n` +
+            `⚙️ Modifier: **${stock.modifier.toFixed(2)}x**`
+        )
+        .addFields({
+            name: '📊 Trend',
+            value:
+                '```' +
+                '\n' +
+                renderTrendGraph(stock.history) +
+                '\n```'
+        })
+        .setFooter({
+            text: '!market | !portfolio | !buyshares | !sellshares'
+        })
+        .setTimestamp();
+}
+
 async function updateMarketBoard(client) {
     const stock = marketTickersState['$FLME'];
 
