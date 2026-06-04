@@ -1,9 +1,5 @@
 /**
- * Renders a high-resolution text-based trend graph matrix.
- * @param {number[]} history - Array of historical price data points.
- * @param {number} maxPoints - Maximum number of recent points to plot (Default: 15).
- * @param {number} rowsCount - Vertical resolution of the graph (Default: 6).
- * @returns {string} Fully formatted ASCII chart string.
+ * Renders a mathematically synchronized text-based trend graph matrix.
  */
 function renderTrendGraph(history, maxPoints = 15, rowsCount = 6) {
     const dataPoints = history.slice(-maxPoints); 
@@ -14,7 +10,7 @@ function renderTrendGraph(history, maxPoints = 15, rowsCount = 6) {
     const spread = maxVal - minVal;
     const colsCount = dataPoints.length;
 
-    // Initialize blank grid matrix with clean padding
+    // Initialize blank grid matrix
     let grid = Array(rowsCount)
         .fill(null)
         .map(() => Array(colsCount).fill(' . '));
@@ -23,33 +19,31 @@ function renderTrendGraph(history, maxPoints = 15, rowsCount = 6) {
     dataPoints.forEach((value, index) => {
         let row;
         if (spread === 0) {
-            // Center line if price has zero movement
-            row = Math.floor(rowsCount / 2);
+            row = Math.floor(rowsCount / 2); // Center if flat
         } else {
-            // Convert price value to a ratio between 0.0 and 1.0
+            // Calculate height scale ratio (0 = minVal, 1 = maxVal)
             const ratio = (value - minVal) / spread;
-            // Map ratio to row index (highest price -> row 0, lowest price -> last row)
+            // Invert index so 1 goes to row 0 (top) and 0 goes to row rowsCount-1 (bottom)
             row = (rowsCount - 1) - Math.floor(ratio * (rowsCount - 1));
         }
         
-        // Final safety bounds clamping to prevent indexing crashes
         row = Math.max(0, Math.min(rowsCount - 1, row));
         grid[row][index] = ' o '; 
     });
 
-    // Compile grid rows into final text output with vertical axis labeling
+    // Compile rows with exact matching mathematical axis tracking
     let textOutput = '';
     for (let r = 0; r < rowsCount; r++) {
         let labelPrice;
         if (spread === 0) {
             labelPrice = maxVal;
         } else {
+            // Match the top-to-bottom grid scaling exactly
             labelPrice = maxVal - ((r / (rowsCount - 1)) * spread);
         }
         textOutput += `$${labelPrice.toFixed(1).padEnd(6)} │${grid[r].join('')}\n`;
     }
 
-    // Append horizontal timeline axis labels
     textOutput += `${' '.padEnd(7)}└───${'───'.repeat(colsCount)}\n`;
     textOutput += `${' '.padEnd(9)}20m ago ─────────────────────► Live\n`;
 
