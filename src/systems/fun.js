@@ -1,147 +1,107 @@
 const { EmbedBuilder } = require('discord.js');
-const { MARKET_BOARD_CHANNEL_ID } = require('../config');
-const { cleanAmount } = require('../utils/amounts');
 
-const VALID_TICKERS = ['$FLME'];
-let liveDisplayMessageInstance = null;
+const eightBallAnswers = [
+    'Yes.',
+    'No.',
+    'Probably.',
+    'Definitely.',
+    'Outlook grim.',
+    'Ask again later.',
+    'Absolutely not.',
+    'Looks good.'
+];
 
-let marketTickersState = {
-    '$FLME': {
-        price: 100.0,
-        modifier: 1.0,
-        history: [100, 98.5, 101.2, 103, 99.1, 102.4, 101, 103.5, 102.1, 104, 102.5, 101.8, 103.2, 105, 103.9, 106.2, 104.8, 105.5, 104.2, 107],
-        minuteOpen: 100.0
-    }
-};
+async function handleFun(message, args, command) {
+    if (command === '!8ball') {
+        const question = args.slice(1).join(' ');
+        if (!question) return message.reply('❌ Ask a question first.');
 
-function renderTrendGraph(history) {
-    const dataPoints = [...history].slice(-20);
-    const maxVal = Math.max(...dataPoints);
-    const minVal = Math.min(...dataPoints);
-    const spread = maxVal - minVal === 0 ? 1 : maxVal - minVal;
-
-    let gridMatrix = Array(15).fill(null).map(() => Array(20).fill(' │ '));
-
-    for (let c = 0; c < dataPoints.length; c++) {
-        const row = Math.min(14, Math.floor(((maxVal - dataPoints[c]) / spread) * 14));
-        gridMatrix[row][c] = c > 0 && dataPoints[c] < dataPoints[c - 1] ? ' 🟥 ' : ' 🟩 ';
+        const answer = eightBallAnswers[Math.floor(Math.random() * eightBallAnswers.length)];
+        return message.reply(`🔮 **8-Ball:** ${answer}`);
     }
 
-    let out = '';
+    if (command === '!rps') {
+        const choice = args[1]?.toLowerCase();
 
-    for (let r = 0; r < 15; r++) {
-        out += `$${(maxVal - (r / 14 * spread)).toFixed(2).padEnd(6)} 📈${gridMatrix[r].join('')}\n`;
-    }
-
-    return out + `${' '.padEnd(8)} ╚${'════'.repeat(20)}\n`;
-}
-
-async function renderMarketBoardEmbed() {
-    const flme = marketTickersState['$FLME'];
-
-    return new EmbedBuilder()
-        .setColor(flme.price >= flme.minuteOpen ? '#00FF00' : '#FF0000')
-        .setTitle('📈 Live Asset Exchange ($FLME)')
-        .setDescription(`💰 **Price:** $${flme.price.toFixed(2)} | ⚙️ **Modifier:** ${flme.modifier}x`)
-        .addFields({
-            name: '📊 Matrix',
-            value: `\`\`\`py\n${renderTrendGraph(flme.history)}\n\`\`\``
-        })
-        .setFooter({ text: 'Commands: !stock | !portfolio | !buyshares $FLME <amount> | !sellshares $FLME <amount>' })
-        .setTimestamp();
-}
-
-async function updateMarketBoard(client) {
-    const flme = marketTickersState['$FLME'];
-
-    flme.price = Math.max(
-        1,
-        parseFloat((flme.price + ((Math.random() * 4.9 + 0.1) * flme.modifier * (Math.random() > 0.48 ? 1 : -1))).toFixed(2))
-    );
-
-    flme.history.push(flme.price);
-    if (flme.history.length > 25) flme.history.shift();
-
-    if (!MARKET_BOARD_CHANNEL_ID) return;
-
-    try {
-        const channel = await client.channels.fetch(MARKET_BOARD_CHANNEL_ID);
-        const embed = await renderMarketBoardEmbed();
-
-        if (!liveDisplayMessageInstance) {
-            liveDisplayMessageInstance = await channel.send({ embeds: [embed] });
-        } else {
-            await liveDisplayMessageInstance.edit({ embeds: [embed] });
-        }
-    } catch (err) {
-        console.error('Market update failed:', err.message);
-    }
-}
-
-function startMarketLoop(client) {
-    updateMarketBoard(client);
-    setInterval(() => updateMarketBoard(client), 60000);
-}
-
-async function handleMarket(message, args, command, userData) {
-    if (command === '!market' || command === '!stock') {
-        const embed = await renderMarketBoardEmbed();
-        return message.channel.send({ embeds: [embed] });
-    }
-
-    if (command === '!portfolio') {
-        const shares = userData.portfolios?.get('$FLME') || 0;
-        const price = marketTickersState['$FLME'].price;
-        const value = Math.floor(shares * price);
-
-        return message.reply(`📁 **Portfolio**\n$FLME Shares: **${shares}**\nValue: 🪙 **${value} coins**`);
-    }
-
-    if (command === '!buyshares') {
-        const ticker = args[1]?.toUpperCase();
-        const amount = cleanAmount(args[2]);
-
-        if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
-            return message.reply('❌ Usage: `!buyshares $FLME <amount>`');
+        if (!['rock', 'paper', 'scissors'].includes(choice)) {
+            return message.reply('❌ Pick `rock`, `paper`, or `scissors`.');
         }
 
-        const cost = Math.ceil(marketTickersState[ticker].price * amount);
+        const options = ['rock', 'paper', 'scissors'];
+        const bot = options[Math.floor(Math.random() * options.length)];
 
-        if (userData.coins < cost) {
-            return message.reply(`❌ Not enough coins. Cost: 🪙 **${cost}**`);
+        if (choice === bot) {
+            return message.reply(`🤝 Draw. Both picked **${choice}**.`);
         }
 
-        const current = userData.portfolios.get(ticker) || 0;
+        const win =
+            (choice === 'rock' && bot === 'scissors') ||
+            (choice === 'paper' && bot === 'rock') ||
+            (choice === 'scissors' && bot === 'paper');
 
-        userData.coins -= cost;
-        userData.portfolios.set(ticker, current + amount);
-        await userData.save();
-
-        return message.reply(`✅ Bought **${amount} ${ticker}** for 🪙 **${cost} coins**.`);
+        return message.reply(
+            win
+                ? `🎉 You won. You picked **${choice}**, I picked **${bot}**.`
+                : `❌ You lost. You picked **${choice}**, I picked **${bot}**.`
+        );
     }
 
-    if (command === '!sellshares') {
-        const ticker = args[1]?.toUpperCase();
-        const amount = cleanAmount(args[2]);
+    if (command === '!roll') {
+        const max = parseInt(args[1]) || 100;
+        return message.reply(`🎲 You rolled **${Math.floor(Math.random() * max) + 1}** out of ${max}.`);
+    }
 
-        if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
-            return message.reply('❌ Usage: `!sellshares $FLME <amount>`');
+    if (command === '!choose') {
+        const choices = args
+            .slice(1)
+            .join(' ')
+            .split('|')
+            .map(x => x.trim())
+            .filter(Boolean);
+
+        if (choices.length < 2) {
+            return message.reply('❌ Use `!choose option 1 | option 2`.');
         }
 
-        const current = userData.portfolios.get(ticker) || 0;
+        return message.reply(`🤔 I choose: **${choices[Math.floor(Math.random() * choices.length)]}**`);
+    }
 
-        if (current < amount) return message.reply('❌ You do not own enough shares.');
+    if (command === '!coin') {
+        return message.reply(`🪙 **${Math.random() < 0.5 ? 'HEADS' : 'TAILS'}**`);
+    }
 
-        const payout = Math.floor(marketTickersState[ticker].price * amount);
+    if (command === '!dice') {
+        return message.reply(`🎲 You rolled **${Math.floor(Math.random() * 6) + 1}**.`);
+    }
 
-        userData.coins += payout;
-        userData.portfolios.set(ticker, current - amount);
-        await userData.save();
+    if (command === '!poll') {
+        const title = args.slice(1).join(' ');
+        if (!title) return message.reply('❌ Usage: `!poll <question>`');
 
-        return message.reply(`✅ Sold **${amount} ${ticker}** for 🪙 **${payout} coins**.`);
+        const embed = new EmbedBuilder()
+            .setColor('#FF8C00')
+            .setTitle('📊 Server Poll')
+            .setDescription(title)
+            .setFooter({ text: `Opened by ${message.author.username}` });
+
+        const poll = await message.channel.send({ embeds: [embed] });
+
+        await poll.react('👍');
+        await poll.react('👎');
+
+        return true;
+    }
+
+    if (command === '!bananabread') {
+        return message.reply(
+            '🍌🍞 **Banana Bread:** Mix 3 ripe bananas, 1/3 cup melted butter, 1 tsp baking soda, 1 cup sugar, 1 egg, and 1.5 cups flour. Bake at 350°F for about 1 hour.'
+        );
     }
 
     return false;
 }
 
-module.exports = { handleMarket, startMarketLoop };
+module.exports = {
+    handleFun,
+    eightBallAnswers
+};
