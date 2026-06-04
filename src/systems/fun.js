@@ -46,10 +46,34 @@ async function handleFun(message, args, command) {
         );
     }
 
-    if (command === '!roll') {
-        const max = parseInt(args[1]) || 100;
-        return message.reply(`🎲 You rolled **${Math.floor(Math.random() * max) + 1}** out of ${max}.`);
+  if (command === '!roll') {
+    // Clean and parse the input max value
+    const maxInput = args[1];
+    
+    // If they didn't provide a number, default it to a standard 6-sided die
+    if (!maxInput) {
+        const defaultRoll = Math.floor(Math.random() * 6) + 1;
+        return message.reply(`🎲 You rolled a **${defaultRoll}** out of 6.`);
     }
+
+    const max = cleanAmount(maxInput);
+
+    // ─── 🛡️ SECURITY & MATHEMATICAL SAFETY GATES ───
+    // 1. Block numbers less than or equal to 0, or invalid inputs (NaN)
+    if (max === null || isNaN(max) || max <= 0) {
+        return message.reply('❌ You can\'t roll a zero or negative number. Choose a valid positive number.');
+    }
+
+    // 2. Block Infinity and hyper-inflated numbers
+    const MAX_ROLL_LIMIT = 1000000; // ◄ 1 Million max cap. Adjust this if you want it higher!
+    if (max > MAX_ROLL_LIMIT || !isFinite(max)) {
+        return message.reply(`❌ That number is too big! The maximum allowed roll value is **${MAX_ROLL_LIMIT.toLocaleString()}**.`);
+    }
+
+    // ─── EXECUTE THE SAFE ROLL ───
+    const roll = Math.floor(Math.random() * max) + 1;
+    return message.reply(`🎲 You rolled a **${roll}** out of **${max}**.`);
+}
 
     if (command === '!choose') {
         const choices = args
