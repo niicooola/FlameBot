@@ -121,34 +121,6 @@ async function updateMarketBoard(client) {
     }
 }
 
-// ─── ⚡ NEW MARKET MANIPULATION PUMP ENGINE ───
-async function pumpMarketOnChat(client) {
-    const stock = marketTickersState['$FLME'];
-    
-    // Add a solid, positive jump between $0.50 and $2.50 per chat message
-    const pumpAmount = parseFloat((Math.random() * 2.0 + 0.50).toFixed(2));
-    stock.price = parseFloat((stock.price + pumpAmount).toFixed(2));
-    
-    // Smooth out the history plot data line
-    if (stock.history.length > 0) {
-        stock.history[stock.history.length - 1] = stock.price;
-    }
-
-    // Refresh the live text graph board embed instantly
-    if (!MARKET_BOARD_CHANNEL_ID) return;
-    try {
-        const channel = await client.channels.fetch(MARKET_BOARD_CHANNEL_ID);
-        if (!channel) return;
-        
-        const embed = await renderMarketBoardEmbed();
-        if (liveDisplayMessageInstance) {
-            await liveDisplayMessageInstance.edit({ embeds: [embed] });
-        }
-    } catch (err) {
-        console.error('Pump refresh error:', err);
-    }
-}
-
 function startMarketLoop(client) {
     setTimeout(() => {
         updateMarketBoard(client);
@@ -167,7 +139,6 @@ async function handleMarket(message, args, command, userData) {
     }
 
     if (command === '!portfolio') {
-        // Fallback optimization if portfolio Map doesn't exist
         if (!userData.portfolios || typeof userData.portfolios.get !== 'function') {
             userData.portfolios = new Map();
         }
@@ -251,7 +222,5 @@ async function handleMarket(message, args, command, userData) {
 module.exports = {
     handleMarket,
     startMarketLoop,
-    pumpMarketOnChat,
     marketTickersState
 };
-// the secret factor is that everytime flame messages in chat the stock goes up \\
