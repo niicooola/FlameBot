@@ -1,13 +1,8 @@
-const { PREFIX } = require('../config');
+const { startMarketLoop } = require('../systems/market');
 
 module.exports = function(client) {
-    client.on('guildMemberAdd', async member => {
-        try {
-            await member.send(
-                `Welcome to **${member.guild.name}**!\nType \`${PREFIX}help\` in the server.`
-            );
-        } catch {
-            console.log(`Could not DM ${member.user.tag}`);
-        }
+    client.once('ready', () => {
+        console.log(`🔥 FlameBot logged in as ${client.user.tag}`);
+        startMarketLoop(client);
     });
 };
