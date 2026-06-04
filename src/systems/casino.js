@@ -176,7 +176,7 @@ async function runCoinflipGame(message, args, userData) {
 
     let winnings = 0;
     if (choice === result) {
-        winnings = bet * 2;
+        winnings = bet * 3;
     }
 
     userData.coins += winnings;
