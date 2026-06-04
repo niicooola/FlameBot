@@ -172,7 +172,7 @@ async function runCoinflipGame(message, args, userData) {
     userData.coins -= bet;
 
     const choice = (sideInput === 'h' || sideInput === 'heads') ? 'heads' : 'tails';
-    const result = Math.random() > 0.5 ? 'heads' : 'tails';
+    const result = Math.random() > 0.8 ? 'heads' : 'tails';
 
     let winnings = 0;
     if (choice === result) {
