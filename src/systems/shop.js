@@ -1,115 +1,180 @@
 const { EmbedBuilder } = require('discord.js');
-const { getUser } = require('../utils/getUser');
+const {
+    VIP_ROLE_ID,
+    VIP_PRICE,
+    BOOSTER_PRICE,
+    COLOR_PRICE,
+    ORACLE_PRICE,
+    TITLE_PRICE,
+    SHIELD_PRICE
+} = require('../config');
 
-async function handleInfo(message, args, command, userData) {
-    if (command === '!ping') {
-        return message.reply(`🏓 Pong. Latency: \`${Date.now() - message.createdTimestamp}ms\`.`);
-    }
+const { eightBallAnswers } = require('./fun');
 
-    if (command === '!uptime') {
-        const total = Math.floor(process.uptime());
-        const hours = Math.floor(total / 3600);
-        const mins = Math.floor((total % 3600) / 60);
-        return message.reply(`⏱️ Uptime: **${hours}h ${mins}m**`);
-    }
-
-    if (command === '!botinfo') {
+async function handleShop(message, args, command, userData) {
+    if (command === '!shop') {
         return message.channel.send({
             embeds: [
                 new EmbedBuilder()
-                    .setColor('#FF4500')
-                    .setTitle('🤖 Bot Info')
+                    .setColor('#00FFAA')
+                    .setTitle('🏪 FlameBot Shop')
                     .addFields(
-                        { name: 'Servers', value: `${message.client.guilds.cache.size}`, inline: true },
-                        { name: 'Cached Users', value: `${message.client.users.cache.size}`, inline: true },
-                        { name: 'Stack', value: 'Node.js + Discord.js + MongoDB + Render' }
+                        {
+                            name: '💎 VIP',
+                            value: `\`!buy vip\` — 🪙 ${VIP_PRICE}`
+                        },
+                        {
+                            name: '💸 Booster',
+                            value: `\`!buy booster\` — 🪙 ${BOOSTER_PRICE}`
+                        },
+                        {
+                            name: '🎨 Color Role',
+                            value: `\`!buy color #FF0000\` — 🪙 ${COLOR_PRICE}`
+                        },
+                        {
+                            name: '🔮 8Ball Answer',
+                            value: `\`!buy 8ball text\` — 🪙 ${ORACLE_PRICE}`
+                        },
+                        {
+                            name: '🎭 Title',
+                            value: `\`!buy title text\` — 🪙 ${TITLE_PRICE}`
+                        },
+                        {
+                            name: '🛡️ Shield',
+                            value: `\`!buy shield\` — 🪙 ${SHIELD_PRICE}`
+                        }
                     )
             ]
         });
     }
 
-    if (command === '!serverinfo') {
-        return message.channel.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor('#32CD32')
-                    .setTitle(`🏰 ${message.guild.name}`)
-                    .addFields(
-                        { name: 'Members', value: `${message.guild.memberCount}`, inline: true },
-                        { name: 'Boosts', value: `${message.guild.premiumSubscriptionCount || 0}`, inline: true },
-                        { name: 'Server ID', value: message.guild.id }
-                    )
-            ]
+    if (command !== '!buy') return false;
+
+    const item = args[1]?.toLowerCase();
+
+    if (!item) {
+        return message.reply('❌ Usage: `!buy <item>`');
+    }
+
+    if (item === 'vip') {
+        if (userData.coins < VIP_PRICE) {
+            return message.reply(`❌ Need 🪙 **${VIP_PRICE}**.`);
+        }
+
+        const role = message.guild.roles.cache.get(VIP_ROLE_ID);
+
+        if (!role) {
+            return message.reply('❌ VIP role not found. Check `VIP_ROLE_ID` in Render.');
+        }
+
+        await message.member.roles.add(role);
+
+        userData.coins -= VIP_PRICE;
+        await userData.save();
+
+        return message.reply('💎 VIP purchased.');
+    }
+
+    if (item === 'booster') {
+        if (userData.hasBooster) {
+            return message.reply('❌ Booster already active.');
+        }
+
+        if (userData.coins < BOOSTER_PRICE) {
+            return message.reply(`❌ Need 🪙 **${BOOSTER_PRICE}**.`);
+        }
+
+        userData.hasBooster = true;
+        userData.coins -= BOOSTER_PRICE;
+
+        await userData.save();
+
+        return message.reply('💸 Booster purchased. Passive income doubled.');
+    }
+
+    if (item === 'color') {
+        const hex = args[2];
+
+        if (!hex || !/^#[0-9A-F]{6}$/i.test(hex)) {
+            return message.reply('❌ Usage: `!buy color #FF0000`');
+        }
+
+        if (userData.coins < COLOR_PRICE) {
+            return message.reply(`❌ Need 🪙 **${COLOR_PRICE}**.`);
+        }
+
+        const role = await message.guild.roles.create({
+            name: `🎨 Color: ${message.author.username}`,
+            color: hex,
+            reason: 'Shop color purchase'
         });
+
+        await message.member.roles.add(role);
+
+        userData.coins -= COLOR_PRICE;
+        await userData.save();
+
+        return message.reply(`🎨 Color role created: **${hex}**`);
     }
 
-    if (command === '!membercount') {
-        return message.reply(`👥 Members: **${message.guild.memberCount}**`);
+    if (item === '8ball') {
+        const text = args.slice(2).join(' ');
+
+        if (!text || text.length < 3) {
+            return message.reply('❌ Usage: `!buy 8ball <answer>`');
+        }
+
+        if (userData.coins < ORACLE_PRICE) {
+            return message.reply(`❌ Need 🪙 **${ORACLE_PRICE}**.`);
+        }
+
+        eightBallAnswers.push(text);
+
+        userData.coins -= ORACLE_PRICE;
+        await userData.save();
+
+        return message.reply(`🔮 Added custom 8ball answer: **${text}**`);
     }
 
-    if (command === '!whois' || command === '!userinfo') {
-        const target = message.mentions.members.first() || message.member;
+    if (item === 'title') {
+        const title = args.slice(2).join(' ');
 
-        return message.channel.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor('#9B59B6')
-                    .setTitle(`🔍 ${target.user.username}`)
-                    .setThumbnail(target.user.displayAvatarURL({ size: 1024 }))
-                    .addFields(
-                        { name: 'Account Created', value: `<t:${Math.floor(target.user.createdTimestamp / 1000)}:F>` },
-                        { name: 'Joined Server', value: `<t:${Math.floor(target.joinedTimestamp / 1000)}:F>` },
-                        { name: 'User ID', value: target.id }
-                    )
-            ]
-        });
+        if (!title || title.length > 20) {
+            return message.reply('❌ Title must be 1-20 characters.');
+        }
+
+        if (userData.coins < TITLE_PRICE) {
+            return message.reply(`❌ Need 🪙 **${TITLE_PRICE}**.`);
+        }
+
+        userData.customTitle = `[${title}]`;
+        userData.coins -= TITLE_PRICE;
+
+        await userData.save();
+
+        return message.reply(`🎭 Title set to **[${title}]**.`);
     }
 
-    if (command === '!avatar' || command === '!av') {
-        const target = message.mentions.members.first() || message.member;
+    if (item === 'shield') {
+        if (userData.hasShield) {
+            return message.reply('❌ Shield already active.');
+        }
 
-        return message.channel.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor('#1E90FF')
-                    .setTitle(`${target.user.username}'s Avatar`)
-                    .setImage(target.user.displayAvatarURL({ size: 1024 }))
-            ]
-        });
+        if (userData.coins < SHIELD_PRICE) {
+            return message.reply(`❌ Need 🪙 **${SHIELD_PRICE}**.`);
+        }
+
+        userData.hasShield = true;
+        userData.coins -= SHIELD_PRICE;
+
+        await userData.save();
+
+        return message.reply('🛡️ Shield purchased.');
     }
 
-    if (command === '!channelinfo') {
-        return message.reply(`📺 Channel: **${message.channel.name}**\nID: \`${message.channel.id}\``);
-    }
-
-    if (command === '!stats' || command === '!rank') {
-        const target = message.mentions.members.first() || message.member;
-        const data = target.id === message.author.id ? userData : await getUser(target.id);
-        const level = Math.floor(0.1 * Math.sqrt(data.xp));
-        const nextXp = Math.pow((level + 1) / 0.1, 2);
-        const needed = Math.ceil(nextXp - data.xp);
-
-        return message.channel.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor('#1E90FF')
-                    .setTitle(`👤 ${target.user.username} ${data.customTitle || ''}`)
-                    .addFields(
-                        { name: '🪙 Coins', value: `${data.coins}`, inline: true },
-                        { name: '⭐ XP', value: `${data.xp}`, inline: true },
-                        { name: '📈 Level', value: `${level}`, inline: true },
-                        { name: 'Next Level', value: `${needed} XP needed`, inline: true },
-                        { name: 'Bio', value: data.bio || 'No bio set.', inline: false }
-                    )
-            ]
-        });
-    }
-
-    if (command === '!links') {
-        return message.channel.send('🔥 **Community Links**\nYouTube: https://www.youtube.com/@redflamingarrowlive\nTwitch: https://twitch.tv/redflamingarrow_');
-    }
-
-    return false;
+    return message.reply('❌ Unknown shop item.');
 }
 
-module.exports = { handleInfo };
+module.exports = {
+    handleShop
+};
