@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { MARKET_BOARD_CHANNEL_ID } = require('../config');
 const { cleanAmount } = require('../utils/amounts');
+const { renderTrendGraph } = require('../utils/graphs'); // ◄ Clean Utility Import!
 
 const VALID_TICKERS = ['$FLME'];
 
@@ -19,41 +20,6 @@ const marketTickersState = {
         minuteOpen: 100
     }
 };
-
-function renderTrendGraph(history) {
-    const dataPoints = history.slice(-15); 
-    if (dataPoints.length === 0) return 'Processing Market Timeline...';
-
-    const maxVal = Math.max(...dataPoints);
-    const minVal = Math.min(...dataPoints);
-    const spread = maxVal - minVal || 1;
-
-    const rowsCount = 6; 
-    const colsCount = dataPoints.length;
-
-    let grid = Array(rowsCount)
-        .fill(null)
-        .map(() => Array(colsCount).fill(' . '));
-
-    dataPoints.forEach((value, index) => {
-        const row = Math.min(
-            rowsCount - 1,
-            Math.floor(((maxVal - value) / spread) * (rowsCount - 1))
-        );
-        grid[row][index] = ' o '; 
-    });
-
-    let textOutput = '';
-    for (let r = 0; r < rowsCount; r++) {
-        const labelPrice = maxVal - ((r / (rowsCount - 1)) * spread);
-        textOutput += `$${labelPrice.toFixed(1).padEnd(6)} │${grid[r].join('')}\n`;
-    }
-
-    textOutput += `${' '.padEnd(7)}└───${'───'.repeat(colsCount)}\n`;
-    textOutput += `${' '.padEnd(9)}20m ago ─────────────────────► Live\n`;
-
-    return textOutput;
-}
 
 async function renderMarketBoardEmbed() {
     const stock = marketTickersState['$FLME'];
