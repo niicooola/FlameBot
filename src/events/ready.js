@@ -1,41 +1,8 @@
-let systemLogsEnabled = true;
+const { startMarketLoop } = require('../systems/market');
 
-function logsEnabled() {
-    return systemLogsEnabled;
-}
-
-function enableLogs() {
-    systemLogsEnabled = true;
-}
-
-function disableLogs() {
-    systemLogsEnabled = false;
-}
-
-async function dmServerLeadership(guild, embed) {
-    if (!systemLogsEnabled) return;
-
-    try {
-        const members = await guild.members.fetch();
-
-        const leaders = members.filter(member =>
-            member.id === guild.ownerId ||
-            member.roles.cache.some(role => ['Admin', 'Owner/Streamer'].includes(role.name))
-        );
-
-        leaders.forEach(async member => {
-            if (!member.user.bot) {
-                await member.send({ embeds: [embed] }).catch(() => {});
-            }
-        });
-    } catch (err) {
-        console.error('Failed to DM leadership:', err.message);
-    }
-}
-
-module.exports = {
-    logsEnabled,
-    enableLogs,
-    disableLogs,
-    dmServerLeadership
+module.exports = function(client) {
+    client.once('ready', () => {
+        console.log(`🔥 FlameBot logged in as ${client.user.tag}`);
+        startMarketLoop(client);
+    });
 };
