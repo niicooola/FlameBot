@@ -6,34 +6,40 @@ const { cleanAmount } = require('../utils/amounts');
 // ==========================================
 const PLINKO_MULTIPLIERS = [5.0, 2.0, 0.5, 0.2, 0.5, 2.0, 5.0];
 const PLINKO_ROWS = 6;
-
 const SLOT_EMOJIS = ['🍒', '🍋', '🍇', '🍊', '💎', '7️⃣'];
 
-// ==========================================
-// 🕹️ PLINKO AUXILIARY RENDERING ENGINE
-// ==========================================
-function generatePlinkoBoard(path) {
-    let boardText = '```\n     🔴 DROP\n';
-    let currentPos = 3; // Center alignment baseline
+// Helper utility to pause execution for the frame delay animation loop
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    for (let r = 0; r < PLINKO_ROWS; r++) {
-        if (r < path.length) {
-            currentPos += path[r] === 1 ? 0.5 : -0.5;
-        }
+// ==========================================
+// 🕹️ PLINKO ANIMATED RENDERING ENGINE
+// ==========================================
+function generatePlinkoFrame(currentRow, currentPos) {
+    // Exact static peg board coordinates to guarantee layout alignment on Discord
+    let rows = [
+        [' ', ' ', ' ', '.', ' ', '.', ' ', ' ', ' '],
+        [' ', ' ', '.', ' ', '.', ' ', '.', ' ', ' '],
+        [' ', '.', ' ', '.', ' ', '.', ' ', '.', ' '],
+        [' ', '.', ' ', '.', ' ', '.', ' ', '.', ' ', '.'],
+        ['.', ' ', '.', ' ', '.', ' ', '.', ' ', '.', ' '],
+        ['.', ' ', '.', ' ', '.', ' ', '.', ' ', '.', ' ', '.']
+    ];
 
-        let rowStr = ' '.repeat(Math.floor(PLINKO_ROWS - r));
-        for (let p = 0; p <= r + 2; p++) {
-            if (p === Math.floor(currentPos)) {
-                rowStr += '● ';
-            } else {
-                rowStr += '. ';
-            }
-        }
-        boardText += `${rowStr}\n`;
+    // Overwrite the specific row peg index with the ball character if the ball has dropped to or past that level
+    if (currentRow >= 0 && currentRow < PLINKO_ROWS) {
+        let activeIndex = Math.max(0, Math.min(rows[currentRow].length - 1, currentPos));
+        rows[currentRow][activeIndex] = '●';
     }
 
-    boardText += '───────────────────\n';
-    boardText += `[5x][2x][.5][.2][.5][2x][5x]\n\`\`\``;
+    // Join the rows together into an aligned, code-blocked string pyramid output layout
+    let boardText = '```\n       ' + (currentRow === -1 ? '🔴 DROP' : '  DROP') + '\n';
+    for (let r = 0; r < PLINKO_ROWS; r++) {
+        let padding = ' '.repeat(PLINKO_ROWS - r + 1);
+        boardText += padding + rows[r].join('') + '\n';
+    }
+
+    boardText += ' ───────────────────────\n';
+    boardText += ' [5x][2x][.5][.2][.5][2x][5x]\n\`\`\``;
     return boardText;
 }
 
@@ -53,9 +59,11 @@ async function runPlinkoGame(message, args, userData) {
         return true;
     }
 
+    // Deduct the bet upfront
     userData.coins -= bet;
+    await userData.save();
 
-    // Simulate peg mechanics (0 = left, 1 = right)
+    // 1. Calculate path route indexes immediately (0 = left bounce, 1 = right bounce)
     let path = [];
     let rightTurns = 0;
     for (let i = 0; i < PLINKO_ROWS; i++) {
@@ -67,18 +75,41 @@ async function runPlinkoGame(message, args, userData) {
     const multiplier = PLINKO_MULTIPLIERS[rightTurns];
     const winnings = Math.floor(bet * multiplier);
 
+    // 2. Pre-stage initial loading message frame
+    const initialBoard = generatePlinkoFrame(-1, 3);
+    const gameMessage = await message.reply({
+        content: `🎰 **FLAMEBOT PLINKO** 🎰\n${initialBoard}\nPlacing bet... 🪙`
+    });
+
+    // 3. Live animation loop execution layer (0.5s intervals)
+    let currentBallPos = 3;
+    for (let r = 0; r < PLINKO_ROWS; r++) {
+        await sleep(500); // ◄ 0.5 second interval delay frames
+        
+        currentBallPos += path[r] === 1 ? 1 : -1;
+        const currentFrame = generatePlinkoFrame(r, currentBallPos);
+
+        await gameMessage.edit({
+            content: `🎰 **FLAMEBOT PLINKO** 🎰\n${currentFrame}\nBouncing down the peg boards... ⏱️`
+        });
+    }
+
+    // 4. Update wallet values and save parameters to MongoDB
     userData.coins += winnings;
     await userData.save();
 
-    const boardVisual = generatePlinkoBoard(path);
+    // Final result readout calculations
+    const finalBoard = generatePlinkoFrame(PLINKO_ROWS, currentBallPos); // Clears ball to show board background
     const netChange = winnings - bet;
     const resultText = netChange >= 0 
         ? `🟢 **WIN!** Landed on **${multiplier}x** and cashed out 🪙 **${winnings}**!`
         : `🔴 **LOSS!** Landed on **${multiplier}x** and only got back 🪙 **${winnings}**...`;
 
-    await message.reply({
-        content: `🎰 **FLAMEBOT PLINKO** 🎰\n${boardVisual}\n${resultText}\nWallet: 🪙 **${userData.coins}**`
+    await sleep(500); // Small final pause before tracking calculations output
+    await gameMessage.edit({
+        content: `🎰 **FLAMEBOT PLINKO** 🎰\n${finalBoard}\n${resultText}\nWallet: 🪙 **${userData.coins}**`
     });
+
     return true;
 }
 
@@ -96,7 +127,6 @@ async function runSlotsGame(message, args, userData) {
 
     userData.coins -= bet;
 
-    // Roll three random slots
     const slot1 = SLOT_EMOJIS[Math.floor(Math.random() * SLOT_EMOJIS.length)];
     const slot2 = SLOT_EMOJIS[Math.floor(Math.random() * SLOT_EMOJIS.length)];
     const slot3 = SLOT_EMOJIS[Math.floor(Math.random() * SLOT_EMOJIS.length)];
@@ -176,7 +206,7 @@ async function handleCasino(message, args, command, userData) {
         return await runCoinflipGame(message, args, userData);
     }
 
-    return false; // Skips execution seamlessly if it's not a casino command
+    return false;
 }
 
 module.exports = {
