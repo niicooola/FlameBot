@@ -1,15 +1,14 @@
 {
   "name": "flamebot",
-  "version": "6.0.0",
-  "description": "24/7 Cloud Powered Discord Bot",
+  "version": "2.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
+    "discord.js": "^14.15.3",
     "dotenv": "^16.4.5",
-    "mongoose": "^8.2.0",
-    "groq-sdk": "latest"
+    "groq-sdk": "^0.7.0",
+    "mongoose": "^8.4.0"
   }
 }
