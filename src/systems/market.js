@@ -20,32 +20,60 @@ const marketTickersState = {
     }
 };
 
-// Generates an unbreakable, single fluid line vector using progression blocks
+// Generates an unbreakable, single fluid line graph with continuous step connectors
 function renderTrendGraph(history) {
-    const dataPoints = history.slice(-20); // Track last 20 ticks
+    const dataPoints = history.slice(-20); // Maintain 20-interval scale
     if (dataPoints.length === 0) return 'Processing Market Timeline...';
 
     const maxVal = Math.max(...dataPoints);
     const minVal = Math.min(...dataPoints);
     const spread = maxVal - minVal || 1;
 
-    // Unicode sparkline characters from lowest to highest value tier
-    const sparkChars = [' ', ' ', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    const rowsCount = 6; // Perfect height for text line scaling
+    const colsCount = dataPoints.length;
 
-    let sparkline = '';
-    dataPoints.forEach((value) => {
-        // Calculate which tier the value falls into relative to the max/min spread
-        const ratio = (value - minVal) / spread;
-        const charIndex = Math.min(sparkChars.length - 1, Math.floor(ratio * (sparkChars.length - 1)));
-        sparkline += sparkChars[charIndex];
-    });
+    // Create a blank grid using empty space tracking matrix elements
+    let grid = Array(rowsCount)
+        .fill(null)
+        .map(() => Array(colsCount).fill('   '));
 
-    // Add a trailing text visualizer to give direction context
-    const currentPrice = dataPoints[dataPoints.length - 1];
-    const prevPrice = dataPoints[dataPoints.length - 2] || currentPrice;
-    const directionIndicator = currentPrice >= prevPrice ? '📈' : '📉';
+    let mappedRows = dataPoints.map(value => 
+        Math.min(rowsCount - 1, Math.floor(((maxVal - value) / spread) * (rowsCount - 1)))
+    );
 
-    return `${sparkline} ${directionIndicator}`;
+    for (let i = 0; i < colsCount; i++) {
+        const currRow = mappedRows[i];
+        
+        if (i === 0) {
+            grid[currRow][i] = '───';
+        } else {
+            const prevRow = mappedRows[i - 1];
+            
+            if (currRow === prevRow) {
+                // Price stayed flat, draw flat continuous connection segment
+                grid[currRow][i] = '───';
+            } else if (currRow < prevRow) {
+                // Price increased (moves UP to lower matrix indexes)
+                grid[prevRow][i] = '──┐';
+                grid[currRow][i] = '┌──';
+                // Fill in the vertical space gap seamlessly if it skips multiple rows
+                for (let r = currRow + 1; r < prevRow; r++) {
+                    grid[r][i] = '  │';
+                }
+            } else {
+                // Price decreased (moves DOWN to higher matrix indexes)
+                grid[prevRow][i] = '──┘';
+                grid[currRow][i] = '└──';
+                // Fill in the vertical space gap seamlessly if it drops multiple rows
+                for (let r = prevRow + 1; r < currRow; r++) {
+                    grid[r][i] = '  │';
+                }
+            }
+        }
+    }
+
+    // Join the vector elements seamlessly down the grid lines
+    return grid.map(r => r.join('')).join('\n');
 }
 
 async function renderMarketBoardEmbed() {
