@@ -1,79 +1,174 @@
 const { EmbedBuilder } = require('discord.js');
+const { getUser } = require('../utils/getUser');
 
-const eightBallAnswers = [
-    'Yes.', 'No.', 'Probably.', 'Definitely.', 'Outlook grim.',
-    'Ask again later.', 'Absolutely not.', 'Looks good.'
-];
-
-async function handleFun(message, args, command) {
-    if (command === '!8ball') {
-        const question = args.slice(1).join(' ');
-        if (!question) return message.reply('❌ Ask a question first.');
-        const answer = eightBallAnswers[Math.floor(Math.random() * eightBallAnswers.length)];
-        return message.reply(`🔮 **8-Ball:** ${answer}`);
+async function handleInfo(message, args, command, userData) {
+    if (command === '!ping') {
+        return message.reply(`🏓 Pong. Latency: \`${Date.now() - message.createdTimestamp}ms\`.`);
     }
 
-    if (command === '!rps') {
-        const choice = args[1]?.toLowerCase();
-        if (!['rock', 'paper', 'scissors'].includes(choice)) {
-            return message.reply('❌ Pick `rock`, `paper`, or `scissors`.');
-        }
+    if (command === '!uptime') {
+        const total = Math.floor(process.uptime());
+        const hours = Math.floor(total / 3600);
+        const mins = Math.floor((total % 3600) / 60);
 
-        const options = ['rock', 'paper', 'scissors'];
-        const bot = options[Math.floor(Math.random() * options.length)];
-
-        if (choice === bot) return message.reply(`🤝 Draw. Both picked **${choice}**.`);
-
-        const win =
-            (choice === 'rock' && bot === 'scissors') ||
-            (choice === 'paper' && bot === 'rock') ||
-            (choice === 'scissors' && bot === 'paper');
-
-        return message.reply(win
-            ? `🎉 You won. You picked **${choice}**, I picked **${bot}**.`
-            : `❌ You lost. You picked **${choice}**, I picked **${bot}**.`);
+        return message.reply(`⏱️ Uptime: **${hours}h ${mins}m**`);
     }
 
-    if (command === '!roll') {
-        const max = parseInt(args[1]) || 100;
-        return message.reply(`🎲 You rolled **${Math.floor(Math.random() * max) + 1}** out of ${max}.`);
+    if (command === '!botinfo') {
+        return message.channel.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor('#FF4500')
+                    .setTitle('🤖 Bot Info')
+                    .addFields(
+                        {
+                            name: 'Servers',
+                            value: `${message.client.guilds.cache.size}`,
+                            inline: true
+                        },
+                        {
+                            name: 'Cached Users',
+                            value: `${message.client.users.cache.size}`,
+                            inline: true
+                        },
+                        {
+                            name: 'Stack',
+                            value: 'Node.js + Discord.js + MongoDB + Render'
+                        }
+                    )
+            ]
+        });
     }
 
-    if (command === '!choose') {
-        const choices = args.slice(1).join(' ').split('|').map(x => x.trim()).filter(Boolean);
-        if (choices.length < 2) return message.reply('❌ Use `!choose option 1 | option 2`.');
-        return message.reply(`🤔 I choose: **${choices[Math.floor(Math.random() * choices.length)]}**`);
+    if (command === '!serverinfo') {
+        return message.channel.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor('#32CD32')
+                    .setTitle(`🏰 ${message.guild.name}`)
+                    .addFields(
+                        {
+                            name: 'Members',
+                            value: `${message.guild.memberCount}`,
+                            inline: true
+                        },
+                        {
+                            name: 'Boosts',
+                            value: `${message.guild.premiumSubscriptionCount || 0}`,
+                            inline: true
+                        },
+                        {
+                            name: 'Server ID',
+                            value: message.guild.id
+                        }
+                    )
+            ]
+        });
     }
 
-    if (command === '!coin') {
-        return message.reply(`🪙 **${Math.random() < 0.5 ? 'HEADS' : 'TAILS'}**`);
+    if (command === '!membercount') {
+        return message.reply(`👥 Members: **${message.guild.memberCount}**`);
     }
 
-    if (command === '!dice') {
-        return message.reply(`🎲 You rolled **${Math.floor(Math.random() * 6) + 1}**.`);
+    if (command === '!whois' || command === '!userinfo') {
+        const target = message.mentions.members.first() || message.member;
+
+        return message.channel.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor('#9B59B6')
+                    .setTitle(`🔍 ${target.user.username}`)
+                    .setThumbnail(target.user.displayAvatarURL({ size: 1024 }))
+                    .addFields(
+                        {
+                            name: 'Account Created',
+                            value: `<t:${Math.floor(target.user.createdTimestamp / 1000)}:F>`
+                        },
+                        {
+                            name: 'Joined Server',
+                            value: `<t:${Math.floor(target.joinedTimestamp / 1000)}:F>`
+                        },
+                        {
+                            name: 'User ID',
+                            value: target.id
+                        }
+                    )
+            ]
+        });
     }
 
-    if (command === '!poll') {
-        const title = args.slice(1).join(' ');
-        if (!title) return message.reply('❌ Usage: `!poll <question>`');
+    if (command === '!avatar' || command === '!av') {
+        const target = message.mentions.members.first() || message.member;
 
-        const embed = new EmbedBuilder()
-            .setColor('#FF8C00')
-            .setTitle('📊 Server Poll')
-            .setDescription(title)
-            .setFooter({ text: `Opened by ${message.author.username}` });
-
-        const poll = await message.channel.send({ embeds: [embed] });
-        await poll.react('👍');
-        await poll.react('👎');
-        return true;
+        return message.channel.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor('#1E90FF')
+                    .setTitle(`${target.user.username}'s Avatar`)
+                    .setImage(target.user.displayAvatarURL({ size: 1024 }))
+            ]
+        });
     }
 
-    if (command === '!bananabread') {
-        return message.reply('🍌🍞 Mix bananas, butter, sugar, egg, baking soda, flour. Bake at 350°F for about 1 hour.');
+    if (command === '!channelinfo') {
+        return message.reply(`📺 Channel: **${message.channel.name}**\nID: \`${message.channel.id}\``);
+    }
+
+    if (command === '!stats' || command === '!rank') {
+        const target = message.mentions.members.first() || message.member;
+        const data = target.id === message.author.id ? userData : await getUser(target.id);
+
+        const level = Math.floor(0.1 * Math.sqrt(data.xp));
+        const nextXp = Math.pow((level + 1) / 0.1, 2);
+        const needed = Math.ceil(nextXp - data.xp);
+
+        return message.channel.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor('#1E90FF')
+                    .setTitle(`👤 ${target.user.username} ${data.customTitle || ''}`)
+                    .addFields(
+                        {
+                            name: '🪙 Coins',
+                            value: `${data.coins}`,
+                            inline: true
+                        },
+                        {
+                            name: '⭐ XP',
+                            value: `${data.xp}`,
+                            inline: true
+                        },
+                        {
+                            name: '📈 Level',
+                            value: `${level}`,
+                            inline: true
+                        },
+                        {
+                            name: 'Next Level',
+                            value: `${needed} XP needed`,
+                            inline: true
+                        },
+                        {
+                            name: 'Bio',
+                            value: data.bio || 'No bio set.',
+                            inline: false
+                        }
+                    )
+            ]
+        });
+    }
+
+    if (command === '!links') {
+        return message.channel.send(
+            '🔥 **Community Links**\n' +
+            'YouTube: https://www.youtube.com/@redflamingarrowlive\n' +
+            'Twitch: https://twitch.tv/redflamingarrow_'
+        );
     }
 
     return false;
 }
 
-module.exports = { handleFun, eightBallAnswers };
+module.exports = {
+    handleInfo
+};
