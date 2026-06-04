@@ -1,6 +1,7 @@
 const { PREFIX, CHAT_INCOME, LEVEL_CHANNEL_ID, SR_MEMBER_ROLE_ID } = require('../config');
 const { getUser } = require('../utils/getUser');
 
+// System Imports
 const { handleHelp } = require('../systems/help');
 const { handlePolls } = require('../systems/polls');
 const { handleEconomy } = require('../systems/economy');
@@ -15,6 +16,7 @@ const { handleAI } = require('../systems/ai');
 const { handleProfile } = require('../systems/profile');
 const { handleTasks } = require('../systems/tasks');
 const { handleServerTools } = require('../systems/serverTools');
+const { handleRobbing } = require('../systems/robbing'); // ◄ Linked!
 
 async function applyXpAndCoins(message, userData, xpAmount) {
     const oldLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
@@ -60,15 +62,14 @@ module.exports = function(client) {
             const command = contentHasPrefix ? args[0].toLowerCase() : null;
 
             // ─── 2. CHECK FOR PASSTHROUGH AI TRIGGERS FIRST ───
-            // This allows the AI to catch passive chat triggers, mentions, and replies *before* we block non-prefix messages
+            // Evaluates conversational triggers, tags, and replies before checking prefixes
             const handledAI = await handleAI(message, args, command, client); 
             if (handledAI) {
-                // If AI responded to a passive chat or reply, award casual text XP and stop
                 await applyXpAndCoins(message, userData, 2);
                 return;
             }
 
-            // ─── 3. IF NO PREFIX AND NOT A REACTION TO AI, JUST PASS REGULAR EXP ───
+            // ─── 3. IF NO PREFIX AND NOT AN AI INTERACTION, STOP AND GIVE CHAT XP ───
             if (!contentHasPrefix) {
                 await applyXpAndCoins(message, userData, 2);
                 return;
@@ -76,7 +77,7 @@ module.exports = function(client) {
 
             // ─── 4. REGULAR COMMAND ROUTING ENGINE ───
             console.log(`COMMAND RECEIVED: ${command}`);
-            await applyXpAndCoins(message, userData, 5); // Command premium XP
+            await applyXpAndCoins(message, userData, 5); // Award premium command XP
 
             if (await handleHelp(message, args, command, userData)) return;
             if (await handlePolls(message, args, command, userData)) return;
@@ -88,6 +89,7 @@ module.exports = function(client) {
             if (await handleShop(message, args, command, userData)) return;
             if (await handleModeration(message, args, command, userData)) return;
             if (await handleAdminEconomy(message, args, command, userData)) return;
+            if (await handleRobbing(message, args, command, userData)) return; // ◄ Evaluated!
             if (await handleProfile(message, args, command, userData)) return;
             if (await handleTasks(message, args, command, userData)) return;
             if (await handleServerTools(message, args, command, userData)) return;
