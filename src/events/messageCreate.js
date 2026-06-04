@@ -1,9 +1,51 @@
-const { PREFIX } = require('../config');
+const { PREFIX, CHAT_INCOME, LEVEL_CHANNEL_ID, SR_MEMBER_ROLE_ID } = require('../config');
 const { getUser } = require('../utils/getUser');
 
+const { handleHelp } = require('../systems/help');
+const { handlePolls } = require('../systems/polls');
 const { handleEconomy } = require('../systems/economy');
 const { handleCasino } = require('../systems/casino');
 const { handleMarket } = require('../systems/market');
+const { handleFun } = require('../systems/fun');
+const { handleInfo } = require('../systems/info');
+const { handleShop } = require('../systems/shop');
+const { handleModeration } = require('../systems/moderation');
+const { handleAdminEconomy } = require('../systems/adminEconomy');
+const { handleAI } = require('../systems/ai');
+const { handleProfile } = require('../systems/profile');
+const { handleTasks } = require('../systems/tasks');
+const { handleServerTools } = require('../systems/serverTools');
+
+async function applyXpAndCoins(message, userData, xpAmount) {
+    const oldLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
+    const income = userData.hasBooster ? CHAT_INCOME * 2 : CHAT_INCOME;
+
+    userData.coins += income;
+    userData.xp += xpAmount;
+
+    const newLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
+
+    if (newLevel > oldLevel) {
+        const bonus = 100 + newLevel * 50;
+        userData.coins += bonus;
+
+        let text = `🎉 <@${message.author.id}> reached **Level ${newLevel}** and earned 🪙 **${bonus}** coins!`;
+
+        if (newLevel >= 10 && SR_MEMBER_ROLE_ID && !message.member.roles.cache.has(SR_MEMBER_ROLE_ID)) {
+            const role = message.guild.roles.cache.get(SR_MEMBER_ROLE_ID);
+            if (role) {
+                await message.member.roles.add(role).catch(() => {});
+                text += `\n🏅 Senior Member role unlocked.`;
+            }
+        }
+
+        const levelChannel = message.guild.channels.cache.get(LEVEL_CHANNEL_ID);
+        if (levelChannel) levelChannel.send(text).catch(() => {});
+        else message.channel.send(text).catch(() => {});
+    }
+
+    await userData.save();
+}
 
 module.exports = function(client) {
     client.on('messageCreate', async message => {
@@ -11,31 +53,44 @@ module.exports = function(client) {
 
         const userData = await getUser(message.author.id);
 
-        if (!message.content.startsWith(PREFIX)) {
-            userData.coins += userData.hasBooster ? 10 : 5;
-            userData.xp += 2;
+        if (userData.afk) {
+            userData.afk = null;
             await userData.save();
+            message.reply('Welcome back. AFK removed.').then(m => {
+                setTimeout(() => m.delete().catch(() => {}), 5000);
+            }).catch(() => {});
+        }
+
+        for (const member of message.mentions.members.values()) {
+            const mentionedData = await getUser(member.id);
+            if (mentionedData.afk) {
+                message.reply(`${member.user.username} is AFK: ${mentionedData.afk}`).catch(() => {});
+            }
+        }
+
+        if (!message.content.startsWith(PREFIX)) {
+            await applyXpAndCoins(message, userData, 2);
             return;
         }
 
         const args = message.content.trim().split(/\s+/);
         const command = args[0].toLowerCase();
 
-        userData.coins += userData.hasBooster ? 10 : 5;
-        userData.xp += 5;
-        await userData.save();
+        await applyXpAndCoins(message, userData, 5);
 
+        if (await handleHelp(message, args, command, userData)) return;
+        if (await handlePolls(message, args, command, userData)) return;
         if (await handleEconomy(message, args, command, userData)) return;
         if (await handleCasino(message, args, command, userData)) return;
         if (await handleMarket(message, args, command, userData)) return;
-
-        if (command === '!help') {
-            return message.channel.send(
-                '**🔥 FlameBot Help**\n' +
-                '`!bal`, `!daily`, `!work`, `!pay`, `!leaderboard`\n' +
-                '`!coinflip`, `!blackjack`, `!gamble`\n' +
-                '`!market`, `!stock`, `!portfolio`, `!buyshares`, `!sellshares`'
-            );
-        }
+        if (await handleFun(message, args, command, userData)) return;
+        if (await handleInfo(message, args, command, userData)) return;
+        if (await handleShop(message, args, command, userData)) return;
+        if (await handleModeration(message, args, command, userData)) return;
+        if (await handleAdminEconomy(message, args, command, userData)) return;
+        if (await handleAI(message, args, command, userData)) return;
+        if (await handleProfile(message, args, command, userData)) return;
+        if (await handleTasks(message, args, command, userData)) return;
+        if (await handleServerTools(message, args, command, userData)) return;
     });
 };
