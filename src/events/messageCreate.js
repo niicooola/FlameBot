@@ -49,48 +49,42 @@ async function applyXpAndCoins(message, userData, xpAmount) {
 
 module.exports = function(client) {
     client.on('messageCreate', async message => {
-        if (message.author.bot || !message.guild) return;
+        try {
+            if (message.author.bot || !message.guild) return;
 
-        const userData = await getUser(message.author.id);
+            const userData = await getUser(message.author.id);
 
-        if (userData.afk) {
-            userData.afk = null;
-            await userData.save();
-            message.reply('Welcome back. AFK removed.').then(m => {
-                setTimeout(() => m.delete().catch(() => {}), 5000);
-            }).catch(() => {});
-        }
-
-        for (const member of message.mentions.members.values()) {
-            const mentionedData = await getUser(member.id);
-            if (mentionedData.afk) {
-                message.reply(`${member.user.username} is AFK: ${mentionedData.afk}`).catch(() => {});
+            if (!message.content.startsWith(PREFIX)) {
+                await applyXpAndCoins(message, userData, 2);
+                return;
             }
+
+            const args = message.content.trim().split(/\s+/);
+            const command = args[0].toLowerCase();
+
+            console.log(`COMMAND RECEIVED: ${command}`);
+
+            await applyXpAndCoins(message, userData, 5);
+
+            if (await handleHelp(message, args, command, userData)) return;
+            if (await handlePolls(message, args, command, userData)) return;
+            if (await handleEconomy(message, args, command, userData)) return;
+            if (await handleCasino(message, args, command, userData)) return;
+            if (await handleMarket(message, args, command, userData)) return;
+            if (await handleFun(message, args, command, userData)) return;
+            if (await handleInfo(message, args, command, userData)) return;
+            if (await handleShop(message, args, command, userData)) return;
+            if (await handleModeration(message, args, command, userData)) return;
+            if (await handleAdminEconomy(message, args, command, userData)) return;
+            if (await handleAI(message, args, command, userData)) return;
+            if (await handleProfile(message, args, command, userData)) return;
+            if (await handleTasks(message, args, command, userData)) return;
+            if (await handleServerTools(message, args, command, userData)) return;
+
+            return message.reply('❌ Unknown command. Use `!help`.');
+        } catch (err) {
+            console.error('MESSAGE CREATE ERROR:', err);
+            return message.reply('❌ Command crashed. Check Render logs.');
         }
-
-        if (!message.content.startsWith(PREFIX)) {
-            await applyXpAndCoins(message, userData, 2);
-            return;
-        }
-
-        const args = message.content.trim().split(/\s+/);
-        const command = args[0].toLowerCase();
-
-        await applyXpAndCoins(message, userData, 5);
-
-        if (await handleHelp(message, args, command, userData)) return;
-        if (await handlePolls(message, args, command, userData)) return;
-        if (await handleEconomy(message, args, command, userData)) return;
-        if (await handleCasino(message, args, command, userData)) return;
-        if (await handleMarket(message, args, command, userData)) return;
-        if (await handleFun(message, args, command, userData)) return;
-        if (await handleInfo(message, args, command, userData)) return;
-        if (await handleShop(message, args, command, userData)) return;
-        if (await handleModeration(message, args, command, userData)) return;
-        if (await handleAdminEconomy(message, args, command, userData)) return;
-        if (await handleAI(message, args, command, userData)) return;
-        if (await handleProfile(message, args, command, userData)) return;
-        if (await handleTasks(message, args, command, userData)) return;
-        if (await handleServerTools(message, args, command, userData)) return;
     });
 };
