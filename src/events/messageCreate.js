@@ -54,17 +54,29 @@ module.exports = function(client) {
 
             const userData = await getUser(message.author.id);
 
-            if (!message.content.startsWith(PREFIX)) {
+            // ─── 1. EXTRACT COMMAND DETAILS IF PREFIX EXISTS ───
+            const args = message.content.trim().split(/\s+/);
+            const contentHasPrefix = message.content.startsWith(PREFIX);
+            const command = contentHasPrefix ? args[0].toLowerCase() : null;
+
+            // ─── 2. CHECK FOR PASSTHROUGH AI TRIGGERS FIRST ───
+            // This allows the AI to catch passive chat triggers, mentions, and replies *before* we block non-prefix messages
+            const handledAI = await handleAI(message, args, command, client); 
+            if (handledAI) {
+                // If AI responded to a passive chat or reply, award casual text XP and stop
                 await applyXpAndCoins(message, userData, 2);
                 return;
             }
 
-            const args = message.content.trim().split(/\s+/);
-            const command = args[0].toLowerCase();
+            // ─── 3. IF NO PREFIX AND NOT A REACTION TO AI, JUST PASS REGULAR EXP ───
+            if (!contentHasPrefix) {
+                await applyXpAndCoins(message, userData, 2);
+                return;
+            }
 
+            // ─── 4. REGULAR COMMAND ROUTING ENGINE ───
             console.log(`COMMAND RECEIVED: ${command}`);
-
-            await applyXpAndCoins(message, userData, 5);
+            await applyXpAndCoins(message, userData, 5); // Command premium XP
 
             if (await handleHelp(message, args, command, userData)) return;
             if (await handlePolls(message, args, command, userData)) return;
@@ -76,7 +88,6 @@ module.exports = function(client) {
             if (await handleShop(message, args, command, userData)) return;
             if (await handleModeration(message, args, command, userData)) return;
             if (await handleAdminEconomy(message, args, command, userData)) return;
-            if (await handleAI(message, args, command, userData)) return;
             if (await handleProfile(message, args, command, userData)) return;
             if (await handleTasks(message, args, command, userData)) return;
             if (await handleServerTools(message, args, command, userData)) return;
