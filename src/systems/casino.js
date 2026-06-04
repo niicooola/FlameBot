@@ -63,7 +63,7 @@ async function runPlinkoGame(message, args, userData) {
     userData.coins -= bet;
     await userData.save();
 
-    // Calculate path route matrix indexes immediately (0 = left bounce, 1 = right bounce)
+    // 1. Calculate path route indexes immediately (0 = left bounce, 1 = right bounce)
     let path = [];
     let rightTurns = 0;
     for (let i = 0; i < PLINKO_ROWS; i++) {
@@ -75,16 +75,16 @@ async function runPlinkoGame(message, args, userData) {
     const multiplier = PLINKO_MULTIPLIERS[rightTurns];
     const winnings = Math.floor(bet * multiplier);
 
-    // Pre-stage initial loading message frame
+    // 2. Pre-stage initial loading message frame
     const initialBoard = generatePlinkoFrame(-1, 3);
     const gameMessage = await message.reply({
         content: `🎰 **FLAMEBOT PLINKO** 🎰\n${initialBoard}\nPlacing bet... 🪙`
     });
 
-    // Live animation loop execution layer (0.5s intervals)
+    // 3. Live animation loop execution layer (0.5s intervals)
     let currentBallPos = 3;
     for (let r = 0; r < PLINKO_ROWS; r++) {
-        await sleep(500); // 0.5 second interval delay frames
+        await sleep(500); // ◄ 0.5 second interval delay frames
         
         currentBallPos += path[r] === 1 ? 1 : -1;
         const currentFrame = generatePlinkoFrame(r, currentBallPos);
@@ -94,7 +94,7 @@ async function runPlinkoGame(message, args, userData) {
         });
     }
 
-    // Update wallet values and save parameters to MongoDB
+    // 4. Update wallet values and save parameters to MongoDB
     userData.coins += winnings;
     await userData.save();
 
@@ -160,7 +160,7 @@ async function runCoinflipGame(message, args, userData) {
     const bet = cleanAmount(args[2]);
 
     if (!['heads', 'tails', 'h', 't'].includes(sideInput) || !bet || bet <= 0) {
-        await message.reply('❌ Usage: `!coinflip <heads/tails> <amount>`\nExample: `!coinflip tails 100`');
+        await message.reply('❌ Usage: `!coinflip <heads/tails> <amount>`');
         return true;
     }
 
@@ -169,25 +169,21 @@ async function runCoinflipGame(message, args, userData) {
         return true;
     }
 
-    // Deduct the bet upfront
     userData.coins -= bet;
 
     const choice = (sideInput === 'h' || sideInput === 'heads') ? 'heads' : 'tails';
-    
-    // Rigged Engine: Math.random() rolls from 0.0 to 1.0. 
-    // Anything below 0.8 (80%) becomes tails. Anything above becomes heads.
-    const result = Math.random() < 0.8 ? 'tails' : 'heads';
+    const result = Math.random() > 0.5 ? 'heads' : 'tails';
 
     let winnings = 0;
     if (choice === result) {
-        winnings = bet * 3; // ◄ Massive 3x Cashout Payout Matrix Engine Activated!
+        winnings = bet * 2;
     }
 
     userData.coins += winnings;
     await userData.save();
 
     const msg = winnings > 0
-        ? `🪙 The coin landed on **${result}**! You won **3x** your bet and cashed out 🪙 **${winnings}**! 🎉`
+        ? `🪙 The coin landed on **${result}**! You won 🪙 **${winnings}**! 🎉`
         : `🪙 The coin landed on **${result}**! You lost 🪙 **${bet}**... 💀`;
 
     await message.reply(`${msg}\nWallet: 🪙 **${userData.coins}**`);
