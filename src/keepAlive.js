@@ -1,19 +1,13 @@
 const http = require('http');
+const { PORT } = require('./config');
 
 function startKeepAlive() {
-    const PORT = process.env.PORT || 3000;
-
     http.createServer((req, res) => {
-        res.writeHead(200, {
-            'Content-Type': 'text/plain'
-        });
-
-        res.end('FlameBot Online');
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('FlameBot is online');
     }).listen(PORT, () => {
-        console.log(`Web server on port ${PORT}`);
+        console.log(`🌐 Web server running on port ${PORT}`);
     });
 }
 
-module.exports = {
-    startKeepAlive
-};
+module.exports = { startKeepAlive };
