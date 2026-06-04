@@ -81,7 +81,11 @@ async function handleEconomy(message, args, command, userData) {
             return `**#${i + 1}** <@${u.id}> — 🪙 ${u.coins}`;
         }).join('\n') || 'No users yet.';
 
-        return message.channel.send(`🏆 **Leaderboard**\n${lines}`);
+        // EMERGENCY PATCH: Added allowedMentions parameter frame to mute the notifications completely
+        return message.channel.send({
+            content: `🏆 **Leaderboard**\n${lines}`,
+            allowedMentions: { users: [] }
+        });
     }
 
     return false;
