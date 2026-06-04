@@ -84,9 +84,9 @@ async function handleCasino(message, args, command, userData) {
         if (isWin) {
             const winnings = bet * 2;
             userData.coins += winnings;
-            await message.reply(`🪙 The coin landed on **${result}**! You won **${winnings}** coins, bro!`);
+            await message.reply(`🪙 The coin landed on **${result}**! You won **${winnings}** coins!`);
         } else {
-            await message.reply(`💀 The coin landed on **${result}**. You guessed wrong and got cooked.`);
+            await message.reply(`The coin landed on **${result}**. You guessed wrong...`);
         }
 
         await userData.save();
@@ -135,7 +135,7 @@ async function handleCasino(message, args, command, userData) {
         }
 
         const gameMessage = await message.channel.send({
-            embeds: [generateBjEmbed('Hit or Stand, bro?', '#FFFF00')],
+            embeds: [generateBjEmbed('Hit or Stand?, '#FFFF00')],
             components: [row]
         });
 
@@ -197,7 +197,7 @@ async function handleCasino(message, args, command, userData) {
                     resultText = '🏆 You outscored the dealer! **You win!**';
                     finalColor = '#00FF00';
                 } else if (pScore < dScore) {
-                    resultText = '💀 Dealer wins. You got cooked.';
+                    resultText = '💀 Dealer wins.';
                     finalColor = '#FF0000';
                 } else {
                     finalUser.coins += bet; // Push scenario: give back original bet
