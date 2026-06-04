@@ -40,7 +40,7 @@ async function handleRobbing(message, args, command) {
         const robberData = await User.findOne({ id: message.author.id }) || await User.create({ id: message.author.id });
         const victimData = await User.findOne({ id: target.id }) || await User.create({ id: target.id });
 
-        // Cooldown Check
+        // ─── 1. COOLDOWN CHECK ───
         const now = new Date();
         if (robberData.lastRobbed) {
             const timePassed = now - new Date(robberData.lastRobbed);
@@ -50,7 +50,7 @@ async function handleRobbing(message, args, command) {
             }
         }
 
-        // Balance Check
+        // ─── 2. BALANCE CHECK ───
         if (robberData.coins < MIN_COINS_REQUIRED) {
             return message.reply(`❌ You need at least 🪙 **${MIN_COINS_REQUIRED}** coins to plan a robbery.`);
         }
@@ -58,7 +58,33 @@ async function handleRobbing(message, args, command) {
             return message.reply(`❌ <@${target.id}> does not have enough coins to be worth targeting.`);
         }
 
-        // Create UI Interactive Buttons
+        // ─── 🛡️ NEW FIXED GATE: ACTIVE PROTECTION SHIELD CHECK ───
+        // Safely checks if victim inventory object exists and contains a shield count higher than 0
+        const victimShields = victimData.inventory ? (victimData.inventory['shield'] || 0) : 0;
+
+        if (victimShields > 0) {
+            // 1. Break 1 shield from the victim's asset allocation inventory map
+            victimData.inventory['shield'] = victimShields - 1;
+            victimData.markModified('inventory');
+            await victimData.save();
+
+            // 2. Slap the robber with the cooldown anyway for attempting the heist
+            robberData.lastRobbed = now;
+            await robberData.save();
+
+            const shieldEmbed = new EmbedBuilder()
+                .setColor('#00FFFF')
+                .setTitle('🛡️ Shield Deflection Active!')
+                .setDescription(
+                    `⚡ <@${message.author.id}> tried to rob <@${target.id}>, but ran straight into a **Protection Shield**!\n\n` +
+                    `💥 The security matrix deflected the attempt completely. <@${target.id}>'s shield shattered in the process, but their coins are safe!\n\n` +
+                    `🚨 <@${message.author.id}>, you are still marked by police and your cooldown has started, bro.`
+                );
+
+            return message.channel.send({ embeds: [shieldEmbed] });
+        }
+
+        // ─── 3. CREATE INTERACTIVE ACTION MENUS IF GATES CLEAR ───
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('rob_pickpocket').setLabel('🥷 Pickpocket (70%)').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId('rob_grandtheft').setLabel('💰 Grand Theft (45%)').setStyle(ButtonStyle.Primary),
@@ -69,7 +95,7 @@ async function handleRobbing(message, args, command) {
             .setColor('#FFFF00')
             .setTitle('🥷 Choose Your Robbery Strategy')
             .setDescription(
-                `Select a option below to choose how you want to rob <@${target.id}>:\n\n` +
+                `Select an option below to choose how you want to rob <@${target.id}>:\n\n` +
                 `🥷 **Pickpocket:** High Success, Low Payout (5% - 15%)\n` +
                 `💰 **Grand Theft:** Medium Success, Medium Payout (15% - 35%)\n` +
                 `💎 **Corporate Heist:** Low Success, Extreme Payout (40% - 75%)`
@@ -78,21 +104,20 @@ async function handleRobbing(message, args, command) {
 
         const menuMessage = await message.channel.send({ embeds: [menuEmbed], components: [row] });
         
-        // Create interaction collector gated strictly to the command author
         const filter = (i) => i.user.id === message.author.id;
         const collector = menuMessage.createMessageComponentCollector({ filter, time: 30000, max: 1 });
 
         collector.on('collect', async (interaction) => {
-            await interaction.deferUpdate(); // Prevents button "interaction failed" delay errors
+            await interaction.deferUpdate();
 
             const mode = ROBBERY_MODES[interaction.customId];
             if (!mode) return;
 
-            // Re-fetch profiles fresh at click action to prevent double-spending balance exploits
+            // Fresh database profile fetch at action execution point
             const activeRobber = await User.findOne({ id: message.author.id });
             const activeVictim = await User.findOne({ id: target.id });
 
-            // Set cooldown stamp instantly
+            // Lock the final robbery cooldown timestamp
             activeRobber.lastRobbed = new Date();
 
             const roll = Math.random();
@@ -143,7 +168,6 @@ async function handleRobbing(message, args, command) {
 
         collector.on('end', async (collected, reason) => {
             if (reason === 'time') {
-                // Remove buttons if user goes AFK
                 await menuMessage.edit({ 
                     content: '⏱️ You took too long to pick a strategy. The target walked away.', 
                     embeds: [], 
@@ -154,7 +178,7 @@ async function handleRobbing(message, args, command) {
 
         return true;
     } catch (err) {
-        console.error('Robbing button execution failure:', err);
+        console.error('Robbing shield check engine breakdown:', err);
         return message.reply('❌ System transaction failure.');
     }
 }
