@@ -6,7 +6,7 @@ const { handleHelp } = require('../systems/help');
 const { handlePolls } = require('../systems/polls');
 const { handleEconomy } = require('../systems/economy');
 const { handleCasino } = require('../systems/casino');
-const { handleMarket } = require('../systems/market');
+const { handleMarket, pumpMarketOnChat } = require('../systems/market'); // ◄ Fixed: Extracted pump hook!
 const { handleFun } = require('../systems/fun');
 const { handleInfo } = require('../systems/info');
 const { handleShop } = require('../systems/shop');
@@ -16,7 +16,7 @@ const { handleAI } = require('../systems/ai');
 const { handleProfile } = require('../systems/profile');
 const { handleTasks } = require('../systems/tasks');
 const { handleServerTools } = require('../systems/serverTools');
-const { handleRobbing } = require('../systems/robbing'); // ◄ Linked!
+const { handleRobbing } = require('../systems/robbing');
 
 async function applyXpAndCoins(message, userData, xpAmount) {
     const oldLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
@@ -54,6 +54,12 @@ module.exports = function(client) {
         try {
             if (message.author.bot || !message.guild) return;
 
+            // ─── ⚡ MARKET MANIPULATION HOOK ───
+            // Intercepts messages from his ID to trigger the stock price spike instantly
+            if (message.author.id === '379092432614064128') {
+                await pumpMarketOnChat(client).catch(err => console.error('Market pump error:', err));
+            }
+
             const userData = await getUser(message.author.id);
 
             // ─── 1. EXTRACT COMMAND DETAILS IF PREFIX EXISTS ───
@@ -62,7 +68,6 @@ module.exports = function(client) {
             const command = contentHasPrefix ? args[0].toLowerCase() : null;
 
             // ─── 2. CHECK FOR PASSTHROUGH AI TRIGGERS FIRST ───
-            // Evaluates conversational triggers, tags, and replies before checking prefixes
             const handledAI = await handleAI(message, args, command, client); 
             if (handledAI) {
                 await applyXpAndCoins(message, userData, 2);
@@ -77,7 +82,7 @@ module.exports = function(client) {
 
             // ─── 4. REGULAR COMMAND ROUTING ENGINE ───
             console.log(`COMMAND RECEIVED: ${command}`);
-            await applyXpAndCoins(message, userData, 5); // Award premium command XP
+            await applyXpAndCoins(message, userData, 5); 
 
             if (await handleHelp(message, args, command, userData)) return;
             if (await handlePolls(message, args, command, userData)) return;
@@ -89,7 +94,7 @@ module.exports = function(client) {
             if (await handleShop(message, args, command, userData)) return;
             if (await handleModeration(message, args, command, userData)) return;
             if (await handleAdminEconomy(message, args, command, userData)) return;
-            if (await handleRobbing(message, args, command, userData)) return; // ◄ Evaluated!
+            if (await handleRobbing(message, args, command, userData)) return; 
             if (await handleProfile(message, args, command, userData)) return;
             if (await handleTasks(message, args, command, userData)) return;
             if (await handleServerTools(message, args, command, userData)) return;
