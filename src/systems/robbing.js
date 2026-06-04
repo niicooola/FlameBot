@@ -1,135 +1,158 @@
 const { EmbedBuilder } = require('discord.js');
 const User = require('../models/User');
 
-// System Configurations
 const ROB_COOLDOWN = 45 * 60 * 1000; // 45 Minutes
-const MIN_COINS_REQUIRED = 300;       // Higher barrier to entry
-let GLOBAL_BOUNTY_POOL = 1000;       // Stays in memory, increases on failures
+const MIN_COINS_REQUIRED = 300;
+
+// Dynamic risk/reward matrix for the choices
+const ROBBERY_MODES = {
+    '🥷': {
+        name: 'Pickpocket',
+        successChance: 0.70, // 70% chance
+        minSteal: 0.05,     // 5% to 15% payout
+        maxSteal: 0.15,
+        failPenalty: 0.10   // Lose 10% on failure
+    },
+    '💰': {
+        name: 'Grand Theft',
+        successChance: 0.45, // 45% chance
+        minSteal: 0.15,     // 15% to 35% payout
+        maxSteal: 0.35,
+        failPenalty: 0.20   // Lose 20% on failure
+    },
+    '💎': {
+        name: 'Corporate Heist',
+        successChance: 0.20, // 20% chance
+        minSteal: 0.40,     // 40% to 75% payout
+        maxSteal: 0.75,
+        failPenalty: 0.45   // Lose 45% on failure (Completely cooked)
+    }
+};
 
 async function handleRobbing(message, args, command) {
-    if (command !== '!rob' && command !== '!bounty' && command !== '!heiststats') return false;
+    if (command !== '!rob') return false;
 
-    // ─── OPTION 1: VIEW GLOBAL CRIMINAL BOUNTY ───
-    if (command === '!bounty') {
-        return message.reply(`🚓 **Current Police Bounty Pool:** 🪙 **${GLOBAL_BOUNTY_POOL}** coins.\n*Claim it by executing a perfect heist, or add to it by getting caught!*`);
-    }
+    const target = message.mentions.members.first();
+    if (!target) return message.reply('❌ Usage: `!rob @user`');
+    if (target.id === message.author.id) return message.reply('💀 Bro tried to rob himself. You are completely cooked.');
+    if (target.user.bot) return message.reply('❌ You cannot rob bots.');
 
-    // ─── OPTION 2: GENERAL ROB COMMAND ───
-    if (command === '!rob') {
-        const target = message.mentions.members.first();
-        if (!target) return message.reply('❌ Usage: `!rob @user`');
-        if (target.id === message.author.id) return message.reply('💀 Bro tried to rob himself. You are completely cooked.');
-        if (target.user.bot) return message.reply('❌ You cannot rob bots.');
+    try {
+        const robberData = await User.findOne({ id: message.author.id }) || await User.create({ id: message.author.id });
+        const victimData = await User.findOne({ id: target.id }) || await User.create({ id: target.id });
 
-        try {
-            const robberData = await User.findOne({ id: message.author.id }) || await User.create({ id: message.author.id });
-            const victimData = await User.findOne({ id: target.id }) || await User.create({ id: target.id });
-
-            // Cooldown Verification
-            const now = new Date();
-            if (robberData.lastRobbed) {
-                const timePassed = now - new Date(robberData.lastRobbed);
-                if (timePassed < ROB_COOLDOWN) {
-                    const timeLeft = Math.ceil((ROB_COOLDOWN - timePassed) / 60000);
-                    return message.reply(`🚨 The heat is still on you. Wait another **${timeLeft} minutes**, bro.`);
-                }
+        // Cooldown Check
+        const now = new Date();
+        if (robberData.lastRobbed) {
+            const timePassed = now - new Date(robberData.lastRobbed);
+            if (timePassed < ROB_COOLDOWN) {
+                const timeLeft = Math.ceil((ROB_COOLDOWN - timePassed) / 60000);
+                return message.reply(`🚨 The heat is still on you. Wait another **${timeLeft} minutes**, bro.`);
             }
+        }
 
-            // Wallet Minimum Balance Checks
-            if (robberData.coins < MIN_COINS_REQUIRED) {
-                return message.reply(`❌ You need at least 🪙 **${MIN_COINS_REQUIRED}** coins in your wallet to plan a robbery.`);
-            }
-            if (victimData.coins < MIN_COINS_REQUIRED) {
-                return message.reply(`❌ <@${target.id}> does not have enough coins to be worth targeting.`);
-            }
+        // Balance Check
+        if (robberData.coins < MIN_COINS_REQUIRED) {
+            return message.reply(`❌ You need at least 🪙 **${MIN_COINS_REQUIRED}** coins to plan a robbery.`);
+        }
+        if (victimData.coins < MIN_COINS_REQUIRED) {
+            return message.reply(`❌ <@${target.id}> does not have enough coins to be worth targeting.`);
+        }
 
-            // Establish Baseline Success Chance
-            let successChance = 0.40; // 40% base rate
+        // Send the Option Selection Menu
+        const menuEmbed = new EmbedBuilder()
+            .setColor('#FFFF00')
+            .setTitle('🥷 Choose Your Robbery Strategy')
+            .setDescription(
+                `Select a reaction below to choose how you want to rob <@${target.id}>:\n\n` +
+                `🥷 **Pickpocket:** High Success (70%), Low Payout (5% - 15%)\n` +
+                `💰 **Grand Theft:** Medium Success (45%), Medium Payout (15% - 35%)\n` +
+                `💎 **Corporate Heist:** Low Success (20%), Extreme Payout (40% - 75%)`
+            )
+            .setFooter({ text: 'You have 30 seconds to make your move...' });
 
-            // Item Expansion Logic Check (Assuming inventory maps exist)
-            const hasSkiMask = robberData.inventory?.includes('ski_mask') || false;
-            const hasVaultDoor = victimData.inventory?.includes('vault_door') || false;
+        const menuMessage = await message.channel.send({ embeds: [menuEmbed] });
+        
+        // Add option emojis
+        await menuMessage.react('🥷');
+        await menuMessage.react('💰');
+        await menuMessage.react('💎');
 
-            if (hasSkiMask) successChance += 0.15;  // Buffs chance to 55%
-            if (hasVaultDoor) successChance -= 0.20; // Drops chance by 20%
+        // Create reaction collector gated to the command author
+        const filter = (reaction, user) => ['🥷', '💰', '💎'].includes(reaction.emoji.name) && user.id === message.author.id;
+        const collector = menuMessage.createReactionCollector({ filter, max: 1, time: 30000 });
 
-            // Server Booster Perk Modification
-            if (message.member.premiumSince) {
-                successChance += 0.05; // 5% boost for supporting the server
-            }
+        collector.on('collect', async (reaction) => {
+            const mode = ROBBERY_MODES[reaction.emoji.name];
+            
+            // Re-fetch profiles right at execution to prevent double-spending balance exploits
+            const activeRobber = await User.findOne({ id: message.author.id });
+            const activeVictim = await User.findOne({ id: target.id });
 
-            // Lock timestamp to prevent spam exploits
-            robberData.lastRobbed = now;
+            // Apply global cooldown timestamp instantly
+            activeRobber.lastRobbed = new Date();
 
             const roll = Math.random();
-            const isSuccess = roll < successChance;
+            const isSuccess = roll < mode.successChance;
 
             if (isSuccess) {
-                // Determine stolen yield (15% to 45%)
-                const stealPercentage = Math.random() * (0.45 - 0.15) + 0.15;
-                let amountStolen = Math.floor(victimData.coins * stealPercentage);
+                const stealPercentage = Math.random() * (mode.maxSteal - mode.minSteal) + mode.minSteal;
+                const amountStolen = Math.floor(activeVictim.coins * stealPercentage);
 
-                // Check if they trigger the lucky Bounty claim (5% chance on a successful rob)
-                let claimedBounty = 0;
-                if (Math.random() < 0.05 && GLOBAL_BOUNTY_POOL > 0) {
-                    claimedBounty = GLOBAL_BOUNTY_POOL;
-                    GLOBAL_BOUNTY_POOL = 1000; // Reset pool
-                }
+                activeRobber.coins += amountStolen;
+                activeVictim.coins -= amountStolen;
 
-                robberData.coins += (amountStolen + claimedBounty);
-                victimData.coins -= amountStolen;
-
-                await robberData.save();
-                await victimData.save();
+                await activeRobber.save();
+                await activeVictim.save();
 
                 const successEmbed = new EmbedBuilder()
                     .setColor('#00FF00')
-                    .setTitle('🥷 Successful Heist!')
+                    .setTitle(`✅ Successful ${mode.name}!`)
                     .setDescription(
-                        `💰 <@${message.author.id}> managed to rob <@${target.id}>!\n\n` +
+                        `💰 <@${message.author.id}> pulled off the heist against <@${target.id}>!\n\n` +
+                        `• **Strategy Used:** ${mode.name}\n` +
                         `• **Stolen Wealth:** 🪙 **${amountStolen}** coins\n` +
-                        (claimedBounty > 0 ? `• **🚨 BOUNTY JACKPOT:** You also cleared the 🪙 **${claimedBounty}** police pool!\n` : '') +
-                        `• **Your New Balance:** 🪙 **${robberData.coins}**`
-                    )
-                    .setFooter({ text: `Final calculated success chance: ${(successChance * 100).toFixed(0)}%` });
+                        `• **Your New Balance:** 🪙 **${activeRobber.coins}**`
+                    );
 
                 await message.channel.send({ embeds: [successEmbed] });
-
             } else {
-                // Penalty Calculation (Lose 20% of current wallet)
-                const fineAmount = Math.floor(robberData.coins * 0.20);
+                const fineAmount = Math.floor(activeRobber.coins * mode.failPenalty);
                 
-                // 30% of the fine goes to the bounty pool, 70% goes straight to the victim
-                const bountyAddition = Math.floor(fineAmount * 0.30);
-                const victimCompensation = fineAmount - bountyAddition;
+                activeRobber.coins -= fineAmount;
+                activeVictim.coins += fineAmount; // Fine goes straight to the victim
 
-                GLOBAL_BOUNTY_POOL += bountyAddition;
-                robberData.coins -= fineAmount;
-                victimData.coins += victimCompensation;
-
-                await robberData.save();
-                await victimData.save();
+                await activeRobber.save();
+                await activeVictim.save();
 
                 const failEmbed = new EmbedBuilder()
                     .setColor('#FF0000')
-                    .setTitle('🚨 Caught by Security!')
+                    .setTitle(`🚨 ${mode.name} Failed!`)
                     .setDescription(
-                        `💀 <@${message.author.id}> tried to rob <@${target.id}> but got cooked by the security system!\n\n` +
-                        `• **Total Fine Paid:** 🪙 **${fineAmount}** coins\n` +
-                        `• **Victim Compensation:** <@${target.id}> received 🪙 **${victimCompensation}**\n` +
-                        `• **Bounty Pool Increase:** 🪙 **${bountyAddition}** added to the police tracking system.`
+                        `💀 <@${message.author.id}> tried to execute a ${mode.name} but got cooked by security!\n\n` +
+                        `• **Penalty:** Paid 🪙 **${fineAmount}** coins in damages.\n` +
+                        `• **Compensation:** <@${target.id}> received the full fine layout.`
                     );
 
                 await message.channel.send({ embeds: [failEmbed] });
             }
+            
+            // Clean up menu after choice
+            await menuMessage.delete().catch(() => {});
+        });
 
-            return true;
-        } catch (err) {
-            console.error('Robbing script crash:', err);
-            return message.reply('❌ Database transaction failure.');
-        }
+        collector.on('end', async (collected, reason) => {
+            if (reason === 'time') {
+                await menuMessage.delete().catch(() => {});
+                await message.reply('⏱️ You took too long to pick a strategy. The target walked away.');
+            }
+        });
+
+        return true;
+    } catch (err) {
+        console.error('Robbing script crash:', err);
+        return message.reply('❌ Database transaction failure.');
     }
-    return false;
 }
 
 module.exports = { handleRobbing };
