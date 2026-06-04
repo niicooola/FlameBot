@@ -1,31 +1,30 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const User = require('../models/User');
 
 const ROB_COOLDOWN = 45 * 60 * 1000; // 45 Minutes
 const MIN_COINS_REQUIRED = 300;
 
-// Dynamic risk/reward matrix for the choices
 const ROBBERY_MODES = {
-    '🥷': {
+    'rob_pickpocket': {
         name: 'Pickpocket',
-        successChance: 0.70, // 70% chance
-        minSteal: 0.05,     // 5% to 15% payout
+        successChance: 0.70,
+        minSteal: 0.05,
         maxSteal: 0.15,
-        failPenalty: 0.10   // Lose 10% on failure
+        failPenalty: 0.10
     },
-    '💰': {
+    'rob_grandtheft': {
         name: 'Grand Theft',
-        successChance: 0.45, // 45% chance
-        minSteal: 0.15,     // 15% to 35% payout
+        successChance: 0.45,
+        minSteal: 0.15,
         maxSteal: 0.35,
-        failPenalty: 0.20   // Lose 20% on failure
+        failPenalty: 0.20
     },
-    '💎': {
+    'rob_corporate': {
         name: 'Corporate Heist',
-        successChance: 0.20, // 20% chance
-        minSteal: 0.40,     // 40% to 75% payout
+        successChance: 0.20,
+        minSteal: 0.40,
         maxSteal: 0.75,
-        failPenalty: 0.45   // Lose 45% on failure (Completely cooked)
+        failPenalty: 0.45
     }
 };
 
@@ -59,37 +58,41 @@ async function handleRobbing(message, args, command) {
             return message.reply(`❌ <@${target.id}> does not have enough coins to be worth targeting.`);
         }
 
-        // Send the Option Selection Menu
+        // Create UI Interactive Buttons
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('rob_pickpocket').setLabel('🥷 Pickpocket (70%)').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('rob_grandtheft').setLabel('💰 Grand Theft (45%)').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('rob_corporate').setLabel('💎 Corp Heist (20%)').setStyle(ButtonStyle.Danger)
+        );
+
         const menuEmbed = new EmbedBuilder()
             .setColor('#FFFF00')
             .setTitle('🥷 Choose Your Robbery Strategy')
             .setDescription(
-                `Select a reaction below to choose how you want to rob <@${target.id}>:\n\n` +
-                `🥷 **Pickpocket:** High Success (70%), Low Payout (5% - 15%)\n` +
-                `💰 **Grand Theft:** Medium Success (45%), Medium Payout (15% - 35%)\n` +
-                `💎 **Corporate Heist:** Low Success (20%), Extreme Payout (40% - 75%)`
+                `Select a option below to choose how you want to rob <@${target.id}>:\n\n` +
+                `🥷 **Pickpocket:** High Success, Low Payout (5% - 15%)\n` +
+                `💰 **Grand Theft:** Medium Success, Medium Payout (15% - 35%)\n` +
+                `💎 **Corporate Heist:** Low Success, Extreme Payout (40% - 75%)`
             )
             .setFooter({ text: 'You have 30 seconds to make your move...' });
 
-        const menuMessage = await message.channel.send({ embeds: [menuEmbed] });
+        const menuMessage = await message.channel.send({ embeds: [menuEmbed], components: [row] });
         
-        // Add option emojis
-        await menuMessage.react('🥷');
-        await menuMessage.react('💰');
-        await menuMessage.react('💎');
+        // Create interaction collector gated strictly to the command author
+        const filter = (i) => i.user.id === message.author.id;
+        const collector = menuMessage.createMessageComponentCollector({ filter, time: 30000, max: 1 });
 
-        // Create reaction collector gated to the command author
-        const filter = (reaction, user) => ['🥷', '💰', '💎'].includes(reaction.emoji.name) && user.id === message.author.id;
-        const collector = menuMessage.createReactionCollector({ filter, max: 1, time: 30000 });
+        collector.on('collect', async (interaction) => {
+            await interaction.deferUpdate(); // Prevents button "interaction failed" delay errors
 
-        collector.on('collect', async (reaction) => {
-            const mode = ROBBERY_MODES[reaction.emoji.name];
-            
-            // Re-fetch profiles right at execution to prevent double-spending balance exploits
+            const mode = ROBBERY_MODES[interaction.customId];
+            if (!mode) return;
+
+            // Re-fetch profiles fresh at click action to prevent double-spending balance exploits
             const activeRobber = await User.findOne({ id: message.author.id });
             const activeVictim = await User.findOne({ id: target.id });
 
-            // Apply global cooldown timestamp instantly
+            // Set cooldown stamp instantly
             activeRobber.lastRobbed = new Date();
 
             const roll = Math.random();
@@ -115,12 +118,12 @@ async function handleRobbing(message, args, command) {
                         `• **Your New Balance:** 🪙 **${activeRobber.coins}**`
                     );
 
-                await message.channel.send({ embeds: [successEmbed] });
+                await menuMessage.edit({ embeds: [successEmbed], components: [] });
             } else {
                 const fineAmount = Math.floor(activeRobber.coins * mode.failPenalty);
                 
                 activeRobber.coins -= fineAmount;
-                activeVictim.coins += fineAmount; // Fine goes straight to the victim
+                activeVictim.coins += fineAmount;
 
                 await activeRobber.save();
                 await activeVictim.save();
@@ -134,24 +137,25 @@ async function handleRobbing(message, args, command) {
                         `• **Compensation:** <@${target.id}> received the full fine layout.`
                     );
 
-                await message.channel.send({ embeds: [failEmbed] });
+                await menuMessage.edit({ embeds: [failEmbed], components: [] });
             }
-            
-            // Clean up menu after choice
-            await menuMessage.delete().catch(() => {});
         });
 
         collector.on('end', async (collected, reason) => {
             if (reason === 'time') {
-                await menuMessage.delete().catch(() => {});
-                await message.reply('⏱️ You took too long to pick a strategy. The target walked away.');
+                // Remove buttons if user goes AFK
+                await menuMessage.edit({ 
+                    content: '⏱️ You took too long to pick a strategy. The target walked away.', 
+                    embeds: [], 
+                    components: [] 
+                }).catch(() => {});
             }
         });
 
         return true;
     } catch (err) {
-        console.error('Robbing script crash:', err);
-        return message.reply('❌ Database transaction failure.');
+        console.error('Robbing button execution failure:', err);
+        return message.reply('❌ System transaction failure.');
     }
 }
 
