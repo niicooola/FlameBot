@@ -6,18 +6,28 @@ const lastWorked = {};
 const lastDaily = {};
 
 // ==========================================
-//      📉 DEFLATED BALANCED SHOP CONFIG      
+//      📉 BALANCED SERVER REWARDS SHOP      
 // ==========================================
 const ECON_SHOP = {
     'shield': {
         name: '🛡️ Protection Shield',
-        price: 350, // Reduced from crazy inflation down to a clean, readable price
-        description: 'Protects your coins from being stolen by other users.'
+        price: 350,
+        description: 'Mutes active !rob theft attempts on your wallet balance for 24 hours.'
     },
-    'lucky_dice': {
-        name: '🎲 Lucky Dice',
-        price: 150,
-        description: 'Slightly boosts your luck multiplier in gambling games.'
+    'title': {
+        name: '🏷️ Custom Profile Title',
+        price: 2500,
+        description: 'Set a custom status badge or title text on your active user profile display!'
+    },
+    'ping': {
+        name: '📢 Stream Hype Alert Ping',
+        price: 8000,
+        description: 'Purchase a one-time global broadcast ping tracking permission card to drop hype.'
+    },
+    'vip': {
+        name: '💎 Elite VIP Server Role Upgrade',
+        price: 25000, // Reduced from absolute hyperinflation down to an achievable flex tier
+        description: 'Unlock permanent VIP status tier permissions, private channels, and chat color.'
     }
 };
 
@@ -54,7 +64,6 @@ async function handleEconomy(message, args, command, userData) {
             return message.reply('❌ Work is on cooldown.');
         }
 
-        // Earn between 50 and 150 coins per hour
         const pay = Math.floor(Math.random() * 101) + 50;
 
         userData.coins += pay;
@@ -105,10 +114,10 @@ async function handleEconomy(message, args, command, userData) {
     }
 
     // ==========================================
-    //          🛒 BALANCED SHOP COMMANDS        
+    //          🛒 UTILITY SERVER SHOP           
     // ==========================================
     if (command === '!shop') {
-        let shopMenu = '🛒 **FlameBot Deflated Item Shop**\n───────────────\n';
+        let shopMenu = '🛒 **FlameBot Server Utility Shop**\n───────────────\n';
         for (const [id, item] of Object.entries(ECON_SHOP)) {
             shopMenu += `🔹 **${item.name}** (\`!buy ${id}\`)\n💰 Price: 🪙 **${item.price} coins**\n📝 *${item.description}*\n\n`;
         }
@@ -124,10 +133,33 @@ async function handleEconomy(message, args, command, userData) {
         }
 
         if (userData.coins < item.price) {
-            return message.reply(`❌ You need 🪙 **${item.price} coins** to buy this, broke boy.`);
+            return message.reply(`❌ You need 🪙 **${item.price} coins** to finalize this transaction.`);
         }
 
-        // Initialize items inventory map safely if it doesn't exist
+        // Handle specific instant server role activation roles instantly
+        if (itemId === 'vip') {
+            const vipRoleId = process.env.VIP_ROLE_ID;
+            if (!vipRoleId) {
+                return message.reply('❌ Configuration Error: VIP_ROLE_ID is missing from the environment configuration framework.');
+            }
+
+            const member = message.member;
+            if (member.roles.cache.has(vipRoleId)) {
+                return message.reply('❌ You are already a certified VIP member in this community space, king.');
+            }
+
+            try {
+                await member.roles.add(vipRoleId);
+                userData.coins -= item.price;
+                await userData.save();
+                return message.reply(`🎉 **HOLY FLEX!** You purchased the **${item.name}** for 🪙 **${item.price} coins**! Your account has been promoted.`);
+            } catch (err) {
+                console.error('Role addition breakdown:', err);
+                return message.reply('❌ Permissions Failure: Make sure FlameBot has a higher hierarchical position assignment than the target role to execute this change.');
+            }
+        }
+
+        // Standard transaction tracking logic routing straight to MongoDB profile structures
         if (!userData.inventory) {
             userData.inventory = new Map();
         }
@@ -139,7 +171,7 @@ async function handleEconomy(message, args, command, userData) {
         
         await userData.save();
 
-        return message.reply(`✅ Successfully bought **${item.name}** for 🪙 **${item.price} coins**!`);
+        return message.reply(`✅ Successfully bought **${item.name}** for 🪙 **${item.price} coins**! Type \`!inv\` to view your tracking assets.`);
     }
 
     return false;
