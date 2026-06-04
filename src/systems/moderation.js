@@ -37,6 +37,11 @@ async function handleModeration(message, args, command) {
         const target = message.mentions.members.first();
         if (!target) return message.reply('❌ Mention a user.');
 
+        // 🛡️ SECURITY GATE 1: Prevent staff from warning people with equal or higher authority
+        if (message.member.roles.highest.position <= target.roles.highest.position) {
+            return message.reply("❌ You can't issue a warning to someone with an equal or higher role, bro.");
+        }
+
         const reason = args.slice(2).join(' ') || 'No reason provided.';
         const data = await User.findOne({ id: target.id }) || await User.create({ id: target.id });
 
@@ -52,16 +57,28 @@ async function handleModeration(message, args, command) {
             .addFields(
                 { name: 'Staff', value: `<@${message.author.id}>`, inline: true },
                 { name: 'Target', value: `<@${target.id}>`, inline: true },
-                { name: 'Reason', value: reason }
+                { name: 'Reason', value: reason },
+                { name: 'Total Strikes', value: `${data.warnings}/3`, inline: true }
             );
 
         await dmServerLeadership(message.guild, embed);
 
-        if (data.warnings >= 3 && target.kickable) {
-            await target.kick('Reached 3 warnings.');
-            data.warnings = 0;
-            await data.save();
-            return message.channel.send('🥾 User auto-kicked for 3 warnings.');
+        // ─── 🛡️ HOV'S PATHTRIGGER SECURITY FIX ───
+        if (data.warnings >= 3) {
+            // Check if the commander has full Mod permissions required to execute a kick
+            if (!isMod(message.member)) {
+                return message.channel.send(`⚠️ <@${target.id}> has reached **3 warnings**, but a full Mod or Admin must review this case because Trial Mods cannot trigger automated kicks.`);
+            }
+
+            // Double check bot permission safety grid
+            if (target.kickable) {
+                await target.kick('Auto-moderation: Accumulated 3 active server warnings.');
+                data.warnings = 0;
+                await data.save();
+                return message.channel.send('🥾 User auto-kicked for 3 warnings.');
+            } else {
+                return message.channel.send(`⚠️ <@${target.id}> hit 3 warnings, but FlameBot lacks role hierarchy to kick them.`);
+            }
         }
 
         return true;
