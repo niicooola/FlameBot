@@ -68,12 +68,7 @@ async function renderMarketBoardEmbed() {
         )
         .addFields({
             name: '📊 High-Resolution Performance Matrix',
-            value:
-                '```' +
-                '\n' +
-                renderTrendGraph(stock.history) +
-                '\n
-```'
+            value: `\`\`\`\n${renderTrendGraph(stock.history)}\n\`\`\`` // FIXED: Single clean line string literal template
         })
         .setFooter({
             text: '!market | !portfolio | !buyshares | !sellshares'
@@ -144,7 +139,6 @@ async function handleMarket(message, args, command, userData) {
     }
 
     if (command === '!portfolio') {
-        // MONGOOSE FIX: Strip the "$" when looking up the database map key
         const dbKey = 'FLME';
         const shares = userData.portfolios?.get(dbKey) || 0;
         const value = shares * marketTickersState['$FLME'].price;
@@ -174,7 +168,6 @@ async function handleMarket(message, args, command, userData) {
             return true;
         }
 
-        // MONGOOSE FIX: Strip the "$" before saving to the Map
         const dbKey = ticker.replace('$', '');
         const current = userData.portfolios.get(dbKey) || 0;
         
@@ -195,7 +188,6 @@ async function handleMarket(message, args, command, userData) {
             return true;
         }
 
-        // MONGOOSE FIX: Strip the "$" before fetching from the Map
         const dbKey = ticker.replace('$', '');
         const current = userData.portfolios.get(dbKey) || 0;
         if (current < amount) {
