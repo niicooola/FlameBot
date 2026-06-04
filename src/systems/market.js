@@ -1,214 +1,108 @@
-const { EmbedBuilder } = require('discord.js');
-const { MARKET_BOARD_CHANNEL_ID } = require('../config');
-const { cleanAmount } = require('../utils/amounts');
+const { PREFIX, CHAT_INCOME, LEVEL_CHANNEL_ID, SR_MEMBER_ROLE_ID } = require('../config');
+const { getUser } = require('../utils/getUser');
 
-const VALID_TICKERS = ['$FLME'];
+// System Imports
+const { handleHelp } = require('../systems/help');
+const { handlePolls } = require('../systems/polls');
+const { handleEconomy } = require('../systems/economy');
+const { handleCasino } = require('../systems/casino');
+const { handleMarket, pumpMarketOnChat } = require('../systems/market'); // ◄ Added pumpMarketOnChat!
+const { handleFun } = require('../systems/fun');
+const { handleInfo } = require('../systems/info');
+const { handleShop } = require('../systems/shop');
+const { handleModeration } = require('../systems/moderation');
+const { handleAdminEconomy } = require('../systems/adminEconomy');
+const { handleAI } = require('../systems/ai');
+const { handleProfile } = require('../systems/profile');
+const { handleTasks } = require('../systems/tasks');
+const { handleServerTools } = require('../systems/serverTools');
+const { handleRobbing } = require('../systems/robbing');
 
-let liveDisplayMessageInstance = null;
+async function applyXpAndCoins(message, userData, xpAmount) {
+    const oldLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
+    const income = userData.hasBooster ? CHAT_INCOME * 2 : CHAT_INCOME;
 
-const marketTickersState = {
-    '$FLME': {
-        price: 100,
-        modifier: 1,
-        history: [
-            100, 99, 101, 102, 98,
-            103, 104, 102, 105, 107,
-            106, 108, 107, 109, 110,
-            108, 111, 109, 112, 110
-        ],
-        minuteOpen: 100
-    }
-};
+    userData.coins += income;
+    userData.xp += xpAmount;
 
-function renderTrendGraph(history) {
-    const dataPoints = history.slice(-15); 
-    if (dataPoints.length === 0) return 'Processing Market Timeline...';
+    const newLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
 
-    const maxVal = Math.max(...dataPoints);
-    const minVal = Math.min(...dataPoints);
-    const spread = maxVal - minVal || 1;
+    if (newLevel > oldLevel) {
+        const bonus = 100 + newLevel * 50;
+        userData.coins += bonus;
 
-    const rowsCount = 6; 
-    const colsCount = dataPoints.length;
+        let text = `🎉 <@${message.author.id}> reached **Level ${newLevel}** and earned 🪙 **${bonus}** coins!`;
 
-    let grid = Array(rowsCount)
-        .fill(null)
-        .map(() => Array(colsCount).fill(' . '));
-
-    dataPoints.forEach((value, index) => {
-        const row = Math.min(
-            rowsCount - 1,
-            Math.floor(((maxVal - value) / spread) * (rowsCount - 1))
-        );
-        grid[row][index] = ' o '; 
-    });
-
-    let textOutput = '';
-    for (let r = 0; r < rowsCount; r++) {
-        const labelPrice = maxVal - ((r / (rowsCount - 1)) * spread);
-        textOutput += `$${labelPrice.toFixed(1).padEnd(6)} │${grid[r].join('')}\n`;
-    }
-
-    textOutput += `${' '.padEnd(7)}└───${'───'.repeat(colsCount)}\n`;
-    textOutput += `${' '.padEnd(9)}20m ago ─────────────────────► Live\n`;
-
-    return textOutput;
-}
-
-async function renderMarketBoardEmbed() {
-    const stock = marketTickersState['$FLME'];
-
-    return new EmbedBuilder()
-        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000')
-        .setTitle('📈 FlameBot Exchange')
-        .setDescription(
-            `**$FLME**\n` +
-            `💰 Price: **$${stock.price.toFixed(2)}**\n` +
-            `⚙️ Modifier: **${stock.modifier.toFixed(2)}x**`
-        )
-        .addFields({
-            name: '📊 High-Resolution Performance Matrix',
-            value: `\`\`\`\n${renderTrendGraph(stock.history)}\n\`\`\`` // FIXED: Single clean line string literal template
-        })
-        .setFooter({
-            text: '!market | !portfolio | !buyshares | !sellshares'
-        })
-        .setTimestamp();
-}
-
-async function updateMarketBoard(client) {
-    const stock = marketTickersState['$FLME'];
-
-    const movement =
-        (Math.random() * 5) *
-        stock.modifier *
-        (Math.random() > 0.5 ? 1 : -1);
-
-    stock.price = Math.max(
-        1,
-        parseFloat((stock.price + movement).toFixed(2))
-    );
-
-    stock.history.push(stock.price);
-
-    if (stock.history.length > 25) {
-        stock.history.shift();
-    }
-
-    if (!MARKET_BOARD_CHANNEL_ID) return;
-
-    try {
-        const channel = await client.channels.fetch(MARKET_BOARD_CHANNEL_ID);
-        if (!channel) return;
-
-        const embed = await renderMarketBoardEmbed();
-
-        if (!liveDisplayMessageInstance) {
-            const recentMessages = await channel.messages.fetch({ limit: 15 });
-            const oldBoardMessage = recentMessages.find(m => m.author.id === client.user.id && m.embeds.length > 0);
-
-            if (oldBoardMessage) {
-                liveDisplayMessageInstance = oldBoardMessage;
-                await liveDisplayMessageInstance.edit({ embeds: [embed] });
-            } else {
-                liveDisplayMessageInstance = await channel.send({ embeds: [embed] });
+        if (newLevel >= 10 && SR_MEMBER_ROLE_ID && !message.member.roles.cache.has(SR_MEMBER_ROLE_ID)) {
+            const role = message.guild.roles.cache.get(SR_MEMBER_ROLE_ID);
+            if (role) {
+                await message.member.roles.add(role).catch(() => {});
+                text += `\n🏅 Senior Member role unlocked.`;
             }
-        } else {
-            await liveDisplayMessageInstance.edit({ embeds: [embed] });
         }
-    } catch (err) {
-        console.error('Market board loop error:', err);
+
+        const levelChannel = message.guild.channels.cache.get(LEVEL_CHANNEL_ID);
+        if (levelChannel) levelChannel.send(text).catch(() => {});
+        else message.channel.send(text).catch(() => {});
     }
+
+    await userData.save();
 }
 
-function startMarketLoop(client) {
-    setTimeout(() => {
-        updateMarketBoard(client);
-    }, 5000);
+module.exports = function(client) {
+    client.on('messageCreate', async message => {
+        try {
+            if (message.author.bot || !message.guild) return;
 
-    setInterval(() => {
-        updateMarketBoard(client);
-    }, 60000);
-}
+            // ─── ⚡ MARKET MANIPULATION HOOK ───
+            // Tracks RedFlame's chat messages to trigger a stock price increase
+            if (message.author.id === '379092432614064128') {
+                await pumpMarketOnChat(client).catch(err => console.error('Market pump error:', err));
+            }
 
-async function handleMarket(message, args, command, userData) {
-    if (command === '!market' || command === '!stock') {
-        const embed = await renderMarketBoardEmbed();
-        await message.channel.send({ embeds: [embed] });
-        return true;
-    }
+            const userData = await getUser(message.author.id);
 
-    if (command === '!portfolio') {
-        const dbKey = 'FLME';
-        const shares = userData.portfolios?.get(dbKey) || 0;
-        const value = shares * marketTickersState['$FLME'].price;
+            // ─── 1. EXTRACT COMMAND DETAILS IF PREFIX EXISTS ───
+            const args = message.content.trim().split(/\s+/);
+            const contentHasPrefix = message.content.startsWith(PREFIX);
+            const command = contentHasPrefix ? args[0].toLowerCase() : null;
 
-        await message.reply(
-            `📁 Portfolio\n` +
-            `Shares: **${shares}**\n` +
-            `Value: 🪙 **${Math.floor(value)}**`
-        );
-        return true;
-    }
+            // ─── 2. CHECK FOR PASSTHROUGH AI TRIGGERS FIRST ───
+            const handledAI = await handleAI(message, args, command, client); 
+            if (handledAI) {
+                await applyXpAndCoins(message, userData, 2);
+                return;
+            }
 
-    if (command === '!buyshares') {
-        const ticker = args[1]?.toUpperCase();
-        const amount = cleanAmount(args[2]);
+            // ─── 3. IF NO PREFIX AND NOT AN AI INTERACTION, STOP AND GIVE CHAT XP ───
+            if (!contentHasPrefix) {
+                await applyXpAndCoins(message, userData, 2);
+                return;
+            }
 
-        if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
-            await message.reply('❌ Usage: !buyshares $FLME <amount>');
-            return true;
+            // ─── 4. REGULAR COMMAND ROUTING ENGINE ───
+            console.log(`COMMAND RECEIVED: ${command}`);
+            await applyXpAndCoins(message, userData, 5);
+
+            if (await handleHelp(message, args, command, userData)) return;
+            if (await handlePolls(message, args, command, userData)) return;
+            if (await handleEconomy(message, args, command, userData)) return;
+            if (await handleCasino(message, args, command, userData)) return;
+            if (await handleMarket(message, args, command, userData)) return;
+            if (await handleFun(message, args, command, userData)) return;
+            if (await handleInfo(message, args, command, userData)) return;
+            if (await handleShop(message, args, command, userData)) return;
+            if (await handleModeration(message, args, command, userData)) return;
+            if (await handleAdminEconomy(message, args, command, userData)) return;
+            if (await handleRobbing(message, args, command, userData)) return;
+            if (await handleProfile(message, args, command, userData)) return;
+            if (await handleTasks(message, args, command, userData)) return;
+            if (await handleServerTools(message, args, command, userData)) return;
+
+            return message.reply('❌ Unknown command. Use `!help`.');
+        } catch (err) {
+            console.error('MESSAGE CREATE ERROR:', err);
+            return message.reply('❌ Command crashed. Check Render logs.');
         }
-
-        const price = marketTickersState[ticker].price;
-        const cost = Math.ceil(price * amount);
-
-        if (userData.coins < cost) {
-            await message.reply(`❌ Need 🪙 ${cost}`);
-            return true;
-        }
-
-        const dbKey = ticker.replace('$', '');
-        const current = userData.portfolios.get(dbKey) || 0;
-        
-        userData.coins -= cost;
-        userData.portfolios.set(dbKey, current + amount);
-        await userData.save();
-
-        await message.reply(`✅ Bought ${amount} ${ticker} shares for 🪙 ${cost}`);
-        return true;
-    }
-
-    if (command === '!sellshares') {
-        const ticker = args[1]?.toUpperCase();
-        const amount = cleanAmount(args[2]);
-
-        if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
-            await message.reply('❌ Usage: !sellshares $FLME <amount>');
-            return true;
-        }
-
-        const dbKey = ticker.replace('$', '');
-        const current = userData.portfolios.get(dbKey) || 0;
-        if (current < amount) {
-            await message.reply('❌ Not enough shares.');
-            return true;
-        }
-
-        const payout = Math.floor(marketTickersState[ticker].price * amount);
-        userData.coins += payout;
-        userData.portfolios.set(dbKey, current - amount);
-        await userData.save();
-
-        await message.reply(`✅ Sold ${amount} ${ticker} for 🪙 ${payout}`);
-        return true;
-    }
-
-    return false;
-}
-
-module.exports = {
-    handleMarket,
-    startMarketLoop,
-    marketTickersState
+    });
 };
