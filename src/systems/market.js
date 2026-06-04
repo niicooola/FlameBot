@@ -20,60 +20,46 @@ const marketTickersState = {
     }
 };
 
-// Generates an unbreakable, single fluid line graph with continuous step connectors
+// High-resolution grid charting system with explicit X/Y labeled data frames
 function renderTrendGraph(history) {
-    const dataPoints = history.slice(-20); // Maintain 20-interval scale
+    const dataPoints = history.slice(-15); // Spread out by tracking last 15 ticks instead of 20
     if (dataPoints.length === 0) return 'Processing Market Timeline...';
 
     const maxVal = Math.max(...dataPoints);
     const minVal = Math.min(...dataPoints);
     const spread = maxVal - minVal || 1;
 
-    const rowsCount = 6; // Perfect height for text line scaling
+    const rowsCount = 7; // Clean, readable vertical height step
     const colsCount = dataPoints.length;
 
-    // Create a blank grid using empty space tracking matrix elements
+    // Use a clean spacing dot to define the grid field surface map
     let grid = Array(rowsCount)
         .fill(null)
-        .map(() => Array(colsCount).fill('   '));
+        .map(() => Array(colsCount).fill(' · '));
 
-    let mappedRows = dataPoints.map(value => 
-        Math.min(rowsCount - 1, Math.floor(((maxVal - value) / spread) * (rowsCount - 1)))
-    );
+    dataPoints.forEach((value, index) => {
+        const row = Math.min(
+            rowsCount - 1,
+            Math.floor(((maxVal - value) / spread) * (rowsCount - 1))
+        );
+        // Clean, bold marker plot point that stands out natively
+        grid[row][index] = ' ■ '; 
+    });
 
-    for (let i = 0; i < colsCount; i++) {
-        const currRow = mappedRows[i];
-        
-        if (i === 0) {
-            grid[currRow][i] = '───';
-        } else {
-            const prevRow = mappedRows[i - 1];
-            
-            if (currRow === prevRow) {
-                // Price stayed flat, draw flat continuous connection segment
-                grid[currRow][i] = '───';
-            } else if (currRow < prevRow) {
-                // Price increased (moves UP to lower matrix indexes)
-                grid[prevRow][i] = '──┐';
-                grid[currRow][i] = '┌──';
-                // Fill in the vertical space gap seamlessly if it skips multiple rows
-                for (let r = currRow + 1; r < prevRow; r++) {
-                    grid[r][i] = '  │';
-                }
-            } else {
-                // Price decreased (moves DOWN to higher matrix indexes)
-                grid[prevRow][i] = '──┘';
-                grid[currRow][i] = '└──';
-                // Fill in the vertical space gap seamlessly if it drops multiple rows
-                for (let r = prevRow + 1; r < currRow; r++) {
-                    grid[r][i] = '  │';
-                }
-            }
-        }
+    let textOutput = '';
+    for (let r = 0; r < rowsCount; r++) {
+        // Calculate the exact price point tracking each horizontal line grid level
+        const labelPrice = maxVal - ((r / (rowsCount - 1)) * spread);
+        textOutput += `$${labelPrice.toFixed(1).padEnd(6)} │${grid[r].join('')}\n`;
     }
 
-    // Join the vector elements seamlessly down the grid lines
-    return grid.map(r => r.join('')).join('\n');
+    // Add continuous baseline axis grid framing border lines
+    textOutput += `${' '.padEnd(7)}└──${'═══'.repeat(colsCount)}\n`;
+    
+    // X-Axis mapping layout labels spaced out precisely under plot tracks
+    textOutput += `${' '.padEnd(9)}${dataPoints.map((_, i) => `t-${colsCount - i}`.padEnd(3)).join(' ')}\n`;
+
+    return textOutput;
 }
 
 async function renderMarketBoardEmbed() {
@@ -88,7 +74,7 @@ async function renderMarketBoardEmbed() {
             `⚙️ Modifier: **${stock.modifier.toFixed(2)}x**`
         )
         .addFields({
-            name: '📊 20-Min Trend Line',
+            name: '📊 High-Resolution Performance Matrix',
             value:
                 '```' +
                 '\n' +
@@ -128,7 +114,6 @@ async function updateMarketBoard(client) {
 
         const embed = await renderMarketBoardEmbed();
 
-        // PERSISTENT 1-MESSAGE CACHE RECOVERY LOGIC
         if (!liveDisplayMessageInstance) {
             const recentMessages = await channel.messages.fetch({ limit: 15 });
             const oldBoardMessage = recentMessages.find(m => m.author.id === client.user.id && m.embeds.length > 0);
