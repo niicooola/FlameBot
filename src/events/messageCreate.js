@@ -61,22 +61,16 @@ module.exports = function(client) {
             const contentHasPrefix = message.content.startsWith(PREFIX);
             const command = contentHasPrefix ? args[0].toLowerCase() : null;
 			
-            // ─── 2. REGULAR COMMAND ROUTING ENGINE ───
+			// ─── 2. IF NO PREFIX, STOP AND GIVE CHAT XP ───
+            if (!contentHasPrefix) {
+                const handledAI = await handleAI(message, args, command, client); 
+				await applyXpAndCoins(message, userData, 2);
+                return;
+            }
+			
+			// ─── 3. REGULAR COMMAND ROUTING ENGINE ───
             console.log(`COMMAND RECEIVED: ${command}`);
             await applyXpAndCoins(message, userData, 5); 
-			
-			// ─── 3. CHECK FOR PASSTHROUGH AI TRIGGERS ───
-            const handledAI = await handleAI(message, args, command, client); 
-            if (handledAI) {
-                await applyXpAndCoins(message, userData, 2);
-                return;
-            }
-			
-			// ─── 4. IF NO PREFIX, STOP AND GIVE CHAT XP ───
-            if (!contentHasPrefix) {
-                await applyXpAndCoins(message, userData, 2);
-                return;
-            }
 
             if (await handleHelp(message, args, command, userData)) return;
             if (await handlePolls(message, args, command, userData)) return;
