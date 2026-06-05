@@ -11,6 +11,7 @@
     "dotenv": "^16.4.5",
     "groq-sdk": "^0.7.0",
     "mongoose": "^8.4.0",
-    "skia-canvas": "^3.0.8"
+    "chart.js": "^4.4.0",
+    "skia-canvas": "^1.0.0"
   }
 }

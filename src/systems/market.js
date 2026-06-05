@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { MARKET_BOARD_CHANNEL_ID } = require('../config');
 const { cleanAmount } = require('../utils/amounts');
-const { renderTrendGraph } = require('../utils/graphs'); // ◄ Clean Utility Import!
+const { renderTrendGraph } = require('../utils/graphs');
 
 const VALID_TICKERS = ['$FLME'];
 
@@ -11,12 +11,7 @@ const marketTickersState = {
     '$FLME': {
         price: 100,
         modifier: 1,
-        history: [
-            100, 99, 101, 102, 98,
-            103, 104, 102, 105, 107,
-            106, 108, 107, 109, 110,
-            108, 111, 109, 112, 110
-        ],
+        history: Array(20).fill(100),
         minuteOpen: 100
     }
 };
@@ -31,11 +26,11 @@ async function renderMarketBoardEmbed() {
         .setDescription(
             `**$FLME**\n` +
             `💰 Price: **$${stock.price.toFixed(2)}**\n` +
-            `⚙️ Modifier: **${stock.modifier.toFixed(2)}x**`
+            `⚙️ Stability Mode: **ON**`
         )
         .addFields({
-            name: '📊 High-Resolution Performance Matrix',
-            value: `\`\`\`\n${12345}\n\`\`\``
+            name: '📊 Stable Performance Matrix',
+            value: `\`\`\`\n${renderTrendGraph(stock.history)}\n\`\`\``
         })
 		.setImage('attachment://image.png')
         .setFooter({
@@ -49,19 +44,23 @@ async function renderMarketBoardEmbed() {
 async function updateMarketBoard(client) {
     const stock = marketTickersState['$FLME'];
 
-    // 🛡️ FIX: Cache the old price as the absolute minute baseline BEFORE rolling the new movement tick
     stock.minuteOpen = stock.price;
 
-    const movement =
-        (Math.random() * 5) *
-        stock.modifier *
-        (Math.random() > 0.5 ? 1 : -1);
+    const targetValue = 100;
 
-    stock.price = Math.max(
-        1,
-        parseFloat((stock.price + movement).toFixed(2))
-    );
+    // Pulls the price back toward $100 every update
+    const correction = (targetValue - stock.price) * 0.10;
 
+    // Small random movement so it does not look frozen
+    const randomNoise = (Math.random() - 0.5) * 4;
+
+    let targetPrice = stock.price + correction + randomNoise;
+
+    // Stable safety range
+    if (targetPrice < 90) targetPrice = 90;
+    if (targetPrice > 110) targetPrice = 110;
+
+    stock.price = parseFloat(targetPrice.toFixed(2));
     stock.history.push(stock.price);
 
     if (stock.history.length > 25) {
@@ -117,7 +116,7 @@ async function handleMarket(message, args, command, userData) {
         }
 
         const dbKey = 'FLME';
-        const shares = userData.portfolios?.get(dbKey) || 0;
+        const shares = userData.portfolios.get(dbKey) || 0;
         const value = shares * marketTickersState['$FLME'].price;
 
         await message.reply(
@@ -125,6 +124,7 @@ async function handleMarket(message, args, command, userData) {
             `Shares: **${shares}**\n` +
             `Value: 🪙 **${Math.floor(value)}**`
         );
+
         return true;
     }
 
@@ -133,7 +133,7 @@ async function handleMarket(message, args, command, userData) {
         const amount = cleanAmount(args[2]);
 
         if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
-            await message.reply('❌ Usage: !buyshares $FLME <amount>');
+            await message.reply('❌ Usage: `!buyshares $FLME <amount>`');
             return true;
         }
 
@@ -141,7 +141,7 @@ async function handleMarket(message, args, command, userData) {
         const cost = Math.ceil(price * amount);
 
         if (userData.coins < cost) {
-            await message.reply(`❌ Need 🪙 ${cost}`);
+            await message.reply(`❌ Need 🪙 **${cost}**`);
             return true;
         }
 
@@ -151,12 +151,13 @@ async function handleMarket(message, args, command, userData) {
 
         const dbKey = ticker.replace('$', '');
         const current = userData.portfolios.get(dbKey) || 0;
-        
+
         userData.coins -= cost;
         userData.portfolios.set(dbKey, current + amount);
+
         await userData.save();
 
-        await message.reply(`✅ Bought ${amount} ${ticker} shares for 🪙 ${cost}`);
+        await message.reply(`✅ Bought **${amount} ${ticker}** shares for 🪙 **${cost}**`);
         return true;
     }
 
@@ -165,7 +166,7 @@ async function handleMarket(message, args, command, userData) {
         const amount = cleanAmount(args[2]);
 
         if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
-            await message.reply('❌ Usage: !sellshares $FLME <amount>');
+            await message.reply('❌ Usage: `!sellshares $FLME <amount>`');
             return true;
         }
 
@@ -175,17 +176,20 @@ async function handleMarket(message, args, command, userData) {
 
         const dbKey = ticker.replace('$', '');
         const current = userData.portfolios.get(dbKey) || 0;
+
         if (current < amount) {
             await message.reply('❌ Not enough shares.');
             return true;
         }
 
         const payout = Math.floor(marketTickersState[ticker].price * amount);
+
         userData.coins += payout;
         userData.portfolios.set(dbKey, current - amount);
+
         await userData.save();
 
-        await message.reply(`✅ Sold ${amount} ${ticker} for 🪙 ${payout}`);
+        await message.reply(`✅ Sold **${amount} ${ticker}** for 🪙 **${payout}**`);
         return true;
     }
 
