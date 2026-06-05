@@ -23,8 +23,9 @@ const marketTickersState = {
 
 async function renderMarketBoardEmbed() {
     const stock = marketTickersState['$FLME'];
+	const attachment = await renderTrendGraph(stock.history);
 
-    return new EmbedBuilder()
+    /*const embed = new EmbedBuilder()
         .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000') // ◄ Color dynamically tracks the last interval cycle change
         .setTitle('📈 FlameBot Exchange')
         .setDescription(
@@ -34,12 +35,15 @@ async function renderMarketBoardEmbed() {
         )
         .addFields({
             name: '📊 High-Resolution Performance Matrix',
-            value: `\`\`\`\n${renderTrendGraph(stock.history)}\n\`\`\``
+            value: `\`\`\`\n${12345}\n\`\`\``
         })
+		.setImage('attachment://image.png')
         .setFooter({
             text: '!market | !portfolio | !buyshares | !sellshares'
         })
-        .setTimestamp();
+        .setTimestamp();*/
+	
+	return {content: '```Current price of $FLME: $'+stock.price+'```', files: [attachment] };
 }
 
 async function updateMarketBoard(client) {
@@ -70,20 +74,20 @@ async function updateMarketBoard(client) {
         const channel = await client.channels.fetch(MARKET_BOARD_CHANNEL_ID);
         if (!channel) return;
 
-        const embed = await renderMarketBoardEmbed();
+        const graph = await renderMarketBoardEmbed();
 
         if (!liveDisplayMessageInstance) {
             const recentMessages = await channel.messages.fetch({ limit: 15 });
-            const oldBoardMessage = recentMessages.find(m => m.author.id === client.user.id && m.embeds.length > 0);
+            const oldBoardMessage = recentMessages.find(m => m.author.id === client.user.id && m.attachments.size > 0);
 
             if (oldBoardMessage) {
                 liveDisplayMessageInstance = oldBoardMessage;
-                await liveDisplayMessageInstance.edit({ embeds: [embed] });
+                await liveDisplayMessageInstance.edit(graph);
             } else {
-                liveDisplayMessageInstance = await channel.send({ embeds: [embed] });
+                liveDisplayMessageInstance = await channel.send(graph);
             }
         } else {
-            await liveDisplayMessageInstance.edit({ embeds: [embed] });
+            await liveDisplayMessageInstance.edit(graph);
         }
     } catch (err) {
         console.error('Market board loop error:', err);
@@ -102,8 +106,8 @@ function startMarketLoop(client) {
 
 async function handleMarket(message, args, command, userData) {
     if (command === '!market' || command === '!stock') {
-        const embed = await renderMarketBoardEmbed();
-        await message.channel.send({ embeds: [embed] });
+        const graph = await renderMarketBoardEmbed();
+        await message.channel.send(graph);
         return true;
     }
 
