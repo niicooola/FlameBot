@@ -1,7 +1,64 @@
+let useChartjs = true;
+const {CategoryScale, Chart, LinearScale, LineController, LineElement, PointElement} = require('chart.js');
+const {Canvas} = require('skia-canvas');
+const { AttachmentBuilder } = require('discord.js');
+
+async function renderChartImage(history, maxPoints = 15) {
+	Chart.register([
+	  CategoryScale,
+	  LineController,
+	  LineElement,
+	  LinearScale,
+	  PointElement
+	]);
+	const data = history.slice(-maxPoints);
+	let lineColor = [];
+	let i = 0;
+	let prev = data[0]
+	for (const point of data) {
+		if (point === prev) continue;
+		if (point > prev) lineColor.push('green');
+		else lineColor.push('red');
+		prev = point;
+	}
+	
+
+	const canvas = new Canvas(800, 600);
+	const chart = new Chart(
+	  canvas, // TypeScript needs "as any" here
+	  {
+		type: 'line',
+		data: {
+		  labels: ['15 mins ago','','','','','10 mins ago','','','','','5 mins ago','','','','Now'],
+		  datasets: [{
+			label: 'Price of $FLME\n Current Price: '+data[data.length-1],
+			data: data,
+			borderColor: 'red',
+			segment: {
+				borderColor: ctx => lineColor[i++],
+			},
+			pointBackgroundColor: 'rgb(255,255,255,0.1)',
+			pointRadius: 0,
+			borderWidth: 6
+		  }]
+		}
+	  }
+	);
+	const pngBuffer = await canvas.toBuffer('png');
+	const attachment = new AttachmentBuilder(pngBuffer, {
+	  name: 'image.png',
+	});
+	chart.destroy();
+	return pngBuffer;
+}
+
+
 /**
  * Renders a mathematically synchronized text-based trend graph matrix.
  */
-function renderTrendGraph(history, maxPoints = 14, rowsCount = 6) {
+ async function renderTrendGraph(history, maxPoints = 15, rowsCount = 6) {
+	if (useChartjs) return await renderChartImage(history);
+	
     const dataPoints = history.slice(-maxPoints); 
     if (dataPoints.length === 0) return 'Processing Market Timeline...';
 

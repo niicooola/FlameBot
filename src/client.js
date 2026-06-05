@@ -7,7 +7,7 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.GuildMessageReactions // ◄ Added! Tells Discord to send emoji click events to the bot
+        GatewayIntentBits.GuildMessageReactions	 // ◄ Added! Tells Discord to send emoji click events to the bot
     ]
 });
 

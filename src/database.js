@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
-const { MONGO_URI } = require('./config');
+const { MONGO_URI, BRANCH_TEST } = require('./config');
+if (BRANCH_TEST) {
+	require("node:dns/promises").setServers(["1.1.1.1", "8.8.8.8"]);
+}
 
 async function connectDatabase() {
     if (!MONGO_URI) {
