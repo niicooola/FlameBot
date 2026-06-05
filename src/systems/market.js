@@ -48,36 +48,44 @@ async function updateMarketBoard(client) {
     // Cache the old price as the absolute baseline before rolling the new movement tick
     stock.minuteOpen = stock.price;
 
-    let movement = 0;
+    let percentMovement = 0;
     const historyLen = stock.history.length;
 
-    // 🏎️ STREAK ENGINE DETECTOR MECHANISM
+    // 🏎️ HIGH-VOLATILITY PERCENTAGE STREAK ENGINE
     if (historyLen >= 3) {
         const p3 = stock.history[historyLen - 1]; // Last recorded price
         const p2 = stock.history[historyLen - 2]; // 2 intervals ago
         const p1 = stock.history[historyLen - 3]; // 3 intervals ago
 
         if (p3 < p2 && p2 < p1) {
-            // 🚀 3 CONSECUTIVE DOWNS: SHOOT TF UP ($20 to $40)
-            movement = 20 + (Math.random() * 20); 
+            // 🚀 3 CONSECUTIVE DOWNS: HYPER-SPURT UP (Gain 25% to 50% instantly)
+            percentMovement = 0.25 + (Math.random() * 0.25);
         } else if (p3 > p2 && p2 > p1) {
-            // 📉 3 CONSECUTIVE UPS: SHOOT TF DOWN (-$20 to -$40)
-            movement = -(20 + (Math.random() * 20));
+            // 📉 3 CONSECUTIVE UPS: THE BUBBLE BURSTS CRASH (Lose 25% to 50% instantly)
+            percentMovement = -(0.25 + (Math.random() * 0.25));
         } else {
-            // Standard organically simulated market fluctuations
-            movement = (Math.random() * 5) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
+            // Standard organically simulated market fluctuations (Up to ±6% per minute)
+            percentMovement = (Math.random() * 0.06) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
         }
     } else {
-        // Fallback for clean boot states before historical indexes load up
-        movement = (Math.random() * 5) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
+        // Fallback for clean boot states before historical indexes populate
+        percentMovement = (Math.random() * 0.06) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
     }
 
-    // Apply movement delta variables cleanly
-    stock.price = Math.max(
-        1,
-        parseFloat((stock.price + movement).toFixed(2))
-    );
+    // Calculate absolute dollar movement based on current price value
+    let targetPrice = stock.price * (1 + percentMovement);
 
+    // 🛡️ HARD CEILING & FLOOR COERCION MATRIX ($10.00 to $4,000.00)
+    if (targetPrice < 10) {
+        targetPrice = 10;
+    } else if (targetPrice > 4000) {
+        targetPrice = 4000;
+    }
+
+    // Format to clean decimals
+    stock.price = parseFloat(targetPrice.toFixed(2));
+
+    // Push new tick into history tracker
     stock.history.push(stock.price);
 
     if (stock.history.length > 25) {
@@ -109,7 +117,6 @@ async function updateMarketBoard(client) {
         console.error('Market board loop error:', err);
     }
 }
-
 function startMarketLoop(client) {
     // Immediate initial lifecycle invocation offset
     setTimeout(() => {
