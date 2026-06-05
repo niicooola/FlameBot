@@ -7,7 +7,7 @@ const VALID_TICKERS = ['$FLME'];
 
 let liveDisplayMessageInstance = null;
 
-// 🛠️ UPGRADED STATE WITH PERSISTENT TREND COUNTERS
+// 🛠️ PERSISTENT ENGINE STATE CONTROLLER WITH TREND STREAK TRACKERS
 const marketTickersState = {
     '$FLME': {
         price: 100,
@@ -19,8 +19,8 @@ const marketTickersState = {
             108, 111, 109, 112, 110
         ],
         minuteOpen: 100,
-        upStreak: 0,   // Tracks consecutive gains
-        downStreak: 0  // Tracks consecutive losses
+        upStreak: 0,   // Tracks consecutive interval gains
+        downStreak: 0  // Tracks consecutive interval losses
     }
 };
 
@@ -48,53 +48,59 @@ async function renderMarketBoardEmbed() {
 async function updateMarketBoard(client) {
     const stock = marketTickersState['$FLME'];
 
-    // Cache baseline
+    // Cache the previous interval price as the open baseline
     stock.minuteOpen = stock.price;
 
     let percentMovement = 0;
+    const historyLen = stock.history.length;
 
-    // 🏎️ PERSISTENT ENGINE STEP: Check last movement direction before calculation
-    if (stock.history.length > 0) {
-        const lastPrice = stock.history[stock.history.length - 1];
-        
-        if (stock.price <= lastPrice) {
+    // 🏎️ TREND ANALYSIS LOGIC STEP: Compare past actual closes to compute active streaks
+    if (historyLen >= 2) {
+        const standardLast = stock.history[historyLen - 1];
+        const standardPrev = stock.history[historyLen - 2];
+
+        if (standardLast < standardPrev) {
             stock.downStreak++;
-            stock.upStreak = 0; // Break up trend
-        } else {
+            stock.upStreak = 0; // Break consecutive gains
+        } else if (standardLast > standardPrev) {
             stock.upStreak++;
-            stock.downStreak = 0; // Break down trend
+            stock.downStreak = 0; // Break consecutive losses
+        } else {
+            // Flatline edge case: clear streaks to prevent stuck calculations
+            stock.upStreak = 0;
+            stock.downStreak = 0;
         }
     }
 
-    // 💥 EVALUATE STREAK TRIGGERS
-    if (stock.downStreak >= 3) {
-        // 🚀 3 LOSSES IN A ROW: SKYROCKET (Gain 25% to 50%)
-        percentMovement = 0.25 + (Math.random() * 0.25);
-        stock.downStreak = 0; // Reset counter immediately!
-    } else if (stock.upStreak >= 3) {
-        // 📉 3 GAINS IN A ROW: MARKET CRASH (Lose 25% to 50%)
-        percentMovement = -(0.25 + (Math.random() * 0.25));
-        stock.upStreak = 0; // Reset counter immediately!
+    // 💥 HIGH-VOLATILITY THRESHOLD EVALUATOR (HARD-TRIGGER AT 2 STEPS)
+    if (stock.downStreak >= 2) {
+        // 🚀 2 LOSSES IN A ROW: PARABOLIC SHORT SQUEEZE PUMP (Gain 100% to 300% value)
+        percentMovement = 1.0 + (Math.random() * 2.0);
+        stock.downStreak = 0; // Flash reset streak counter
+    } else if (stock.upStreak >= 2) {
+        // 📉 2 GAINS IN A ROW: MASSIVE LIQUIDATION MARKET CRASH (Lose 70% to 90% value)
+        percentMovement = -(0.70 + (Math.random() * 0.20));
+        stock.upStreak = 0; // Flash reset streak counter
     } else {
-        // Standard normal distribution noise (Up to ±6% variation)
-        percentMovement = (Math.random() * 0.06) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
+        // Unhinged flat-market background noise (Up to ±20% wild swings per minute)
+        percentMovement = (Math.random() * 0.20) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
     }
 
-    // Calculate absolute target value
+    // Apply compounding percentage movement calculation
     let targetPrice = stock.price * (1 + percentMovement);
 
-    // 🛡️ HARD LIMIT CEILINGS & FLOORS ($10.00 to $4,000.00)
+    // 🛡️ ECONOMIC SANITY LIMIT CEILINGS & FLOORS ($10.00 to $4,000.00)
     if (targetPrice < 10) {
         targetPrice = 10;
-        stock.downStreak = 0; // Halt streak at floor
     } else if (targetPrice > 4000) {
         targetPrice = 4000;
-        stock.upStreak = 0; // Halt streak at ceiling
     }
 
+    // Format new price state and append to active ledger array
     stock.price = parseFloat(targetPrice.toFixed(2));
     stock.history.push(stock.price);
 
+    // Maintain historical buffer array capacity limits
     if (stock.history.length > 25) {
         stock.history.shift();
     }
@@ -126,11 +132,12 @@ async function updateMarketBoard(client) {
 }
 
 function startMarketLoop(client) {
-    // Immediate initial lifecycle invocation offset
+    // Initial delayed boot trigger loop
     setTimeout(() => {
         updateMarketBoard(client);
     }, 5000);
 
+    // Persistent 60-second execution interval ticker
     setInterval(() => {
         updateMarketBoard(client);
     }, 60000);
