@@ -52,7 +52,6 @@ async function updateMarketBoard(client) {
     stock.minuteOpen = stock.price;
 
     let percentMovement = 0;
-    let triggeredShock = false;
 
     // 🏎️ PERSISTENT ENGINE STEP: Check last movement direction before calculation
     if (stock.history.length > 0) {
@@ -72,12 +71,10 @@ async function updateMarketBoard(client) {
         // 🚀 3 LOSSES IN A ROW: SKYROCKET (Gain 25% to 50%)
         percentMovement = 0.25 + (Math.random() * 0.25);
         stock.downStreak = 0; // Reset counter immediately!
-        triggeredShock = true;
     } else if (stock.upStreak >= 3) {
         // 📉 3 GAINS IN A ROW: MARKET CRASH (Lose 25% to 50%)
         percentMovement = -(0.25 + (Math.random() * 0.25));
         stock.upStreak = 0; // Reset counter immediately!
-        triggeredShock = true;
     } else {
         // Standard normal distribution noise (Up to ±6% variation)
         percentMovement = (Math.random() * 0.06) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
@@ -128,31 +125,6 @@ async function updateMarketBoard(client) {
     }
 }
 
-    if (!MARKET_BOARD_CHANNEL_ID) return;
-
-    try {
-        const channel = await client.channels.fetch(MARKET_BOARD_CHANNEL_ID);
-        if (!channel) return;
-
-        const embed = await renderMarketBoardEmbed();
-
-        if (!liveDisplayMessageInstance) {
-            const recentMessages = await channel.messages.fetch({ limit: 15 });
-            const oldBoardMessage = recentMessages.find(m => m.author.id === client.user.id && m.embeds.length > 0);
-
-            if (oldBoardMessage) {
-                liveDisplayMessageInstance = oldBoardMessage;
-                await liveDisplayMessageInstance.edit({ embeds: [embed] });
-            } else {
-                liveDisplayMessageInstance = await channel.send({ embeds: [embed] });
-            }
-        } else {
-            await liveDisplayMessageInstance.edit({ embeds: [embed] });
-        }
-    } catch (err) {
-        console.error('Market board loop error:', err);
-    }
-}
 function startMarketLoop(client) {
     // Immediate initial lifecycle invocation offset
     setTimeout(() => {
