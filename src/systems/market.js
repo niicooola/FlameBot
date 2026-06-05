@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { MARKET_BOARD_CHANNEL_ID } = require('../config');
 const { cleanAmount } = require('../utils/amounts');
-const { renderTrendGraph } = require('../utils/graphs'); // ◄ Clean Utility Import!
+const { renderTrendGraph } = require('../utils/graphs'); 
 
 const VALID_TICKERS = ['$FLME'];
 
@@ -25,7 +25,7 @@ async function renderMarketBoardEmbed() {
     const stock = marketTickersState['$FLME'];
 
     return new EmbedBuilder()
-        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000') // ◄ Color dynamically tracks the last interval cycle change
+        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000') 
         .setTitle('📈 FlameBot Exchange')
         .setDescription(
             `**$FLME**\n` +
@@ -45,14 +45,34 @@ async function renderMarketBoardEmbed() {
 async function updateMarketBoard(client) {
     const stock = marketTickersState['$FLME'];
 
-    // 🛡️ FIX: Cache the old price as the absolute minute baseline BEFORE rolling the new movement tick
+    // Cache the old price as the absolute baseline before rolling the new movement tick
     stock.minuteOpen = stock.price;
 
-    const movement =
-        (Math.random() * 5) *
-        stock.modifier *
-        (Math.random() > 0.5 ? 1 : -1);
+    let movement = 0;
+    const historyLen = stock.history.length;
 
+    // 🏎️ STREAK ENGINE DETECTOR MECHANISM
+    if (historyLen >= 3) {
+        const p3 = stock.history[historyLen - 1]; // Last recorded price
+        const p2 = stock.history[historyLen - 2]; // 2 intervals ago
+        const p1 = stock.history[historyLen - 3]; // 3 intervals ago
+
+        if (p3 < p2 && p2 < p1) {
+            // 🚀 3 CONSECUTIVE DOWNS: SHOOT TF UP ($20 to $40)
+            movement = 20 + (Math.random() * 20); 
+        } else if (p3 > p2 && p2 > p1) {
+            // 📉 3 CONSECUTIVE UPS: SHOOT TF DOWN (-$20 to -$40)
+            movement = -(20 + (Math.random() * 20));
+        } else {
+            // Standard organically simulated market fluctuations
+            movement = (Math.random() * 5) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
+        }
+    } else {
+        // Fallback for clean boot states before historical indexes load up
+        movement = (Math.random() * 5) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
+    }
+
+    // Apply movement delta variables cleanly
     stock.price = Math.max(
         1,
         parseFloat((stock.price + movement).toFixed(2))
@@ -91,6 +111,7 @@ async function updateMarketBoard(client) {
 }
 
 function startMarketLoop(client) {
+    // Immediate initial lifecycle invocation offset
     setTimeout(() => {
         updateMarketBoard(client);
     }, 5000);
@@ -113,7 +134,7 @@ async function handleMarket(message, args, command, userData) {
         }
 
         const dbKey = 'FLME';
-        const shares = userData.portfolios?.get(dbKey) || 0;
+        const shares = userData.portfolios.get(dbKey) || 0;
         const value = shares * marketTickersState['$FLME'].price;
 
         await message.reply(
