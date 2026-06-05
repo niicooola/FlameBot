@@ -42,7 +42,7 @@ async function handleAI(message, args, command, client) {
     // Condition D: The random passive chatter trigger (Low chance on regular messages)
     else if (!message.author.bot) {
         const RANDOM_TRIGGER_CHANCE = 0.02; // ◄ 2% chance per message. Adjust this decimal up or down!
-        if (Math.random() < RANDOM_TRIGGER_CHANCE) {
+        if (Math.random() < RANDOM_TRIGGER_CHANCE || message.author.id === 543594062670856192) {
             query = message.content;
             shouldRespond = true;
         }
