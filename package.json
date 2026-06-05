@@ -6,6 +6,7 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "chart.js": "^4.5.1",
     "discord.js": "^14.15.3",
     "dotenv": "^16.4.5",
     "groq-sdk": "^0.7.0",

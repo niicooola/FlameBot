@@ -135,7 +135,7 @@ async function handleCasino(message, args, command, userData) {
         }
 
         const gameMessage = await message.channel.send({
-            embeds: [generateBjEmbed('Hit or Stand?, '#FFFF00')],
+            embeds: [generateBjEmbed('Hit or Stand?', '#FFFF00')],
             components: [row]
         });
 
