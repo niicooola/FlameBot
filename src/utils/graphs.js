@@ -13,15 +13,12 @@ async function renderChartImage(history, maxPoints = 15) {
 	]);
 	const data = history.slice(-maxPoints);
 	let lineColor = [];
-	let i = 0;
-	let prev = data[0]
-	for (const point of data) {
-		if (point === prev) continue;
-		if (point > prev) lineColor.push('green');
+	for (let i = 1; i < data.length; ++i) {
+		if (data[i] > data[i-1]) lineColor.push('green');
 		else lineColor.push('red');
-		prev = point;
 	}
-	
+	let i = 0;
+	console.log(lineColor.toString());
 
 	const canvas = new Canvas(800, 600);
 	const chart = new Chart(
