@@ -48,16 +48,17 @@ async function renderMarketBoardEmbed() {
 async function updateMarketBoard(client) {
     const stock = marketTickersState['$FLME'];
 
-    // Cache the previous interval price as the open baseline before doing calculations
+    // Cache the previous close price as the open baseline before doing calculations
     stock.minuteOpen = stock.price;
 
     let percentMovement = 0;
+    let flatShockBonus = 0;
     const historyLen = stock.history.length;
 
-    // 🏎️ TREND ANALYSIS LOGIC STEP: Compare past actual closes inside the array
+    // 🏎️ FIX: READ THE REAL GRAPH HISTORY ARRAY TO CALCULATE STREAKS
     if (historyLen >= 2) {
-        const standardLast = stock.history[historyLen - 1];
-        const standardPrev = stock.history[historyLen - 2];
+        const standardLast = stock.history[historyLen - 1]; // Previous minute price
+        const standardPrev = stock.history[historyLen - 2]; // Two minutes ago price
 
         if (standardLast < standardPrev) {
             stock.downStreak++;
@@ -66,41 +67,49 @@ async function updateMarketBoard(client) {
             stock.upStreak++;
             stock.downStreak = 0; // Break consecutive losses
         } else {
-            // Flatline edge case: clear streaks to prevent stuck states
+            // Perfect flatline edge case
             stock.upStreak = 0;
             stock.downStreak = 0;
         }
     }
 
-    // 💥 HIGH-VOLATILITY DEGENERACY ENGINE (TRIGGERS AT 2 STEPS)
+    // 💥 HIGH-VOLATILITY DEGENERACY ENGINE (TRIGGERS AT 2 STEPS OF REAL PRICES)
     if (stock.downStreak >= 2) {
-        // 🚀 2 LOSSES IN A ROW: PARABOLIC SHORT SQUEEZE PUMP (Gain 100% to 300% value)
-        percentMovement = 1.0 + (Math.random() * 2.0);
+        // 🚀 2 DOWN-TICKS REAL PRICE STREAK: MOONSHOT PUMP (Multiply AND inject $500–$1500 pure cash)
+        const multiplier = 2.0 + (Math.random() * 2.0); // 2x to 4x value multiplier
+        percentMovement = multiplier - 1; 
+        flatShockBonus = 500 + Math.floor(Math.random() * 1000); // Guarantees a massive visual spike
         stock.downStreak = 0; // Flash reset streak counter
     } else if (stock.upStreak >= 2) {
-        // 📉 2 GAINS IN A ROW: MASSIVE LIQUIDATION MARKET CRASH (Lose 70% to 90% value)
+        // 📉 2 UP-TICKS REAL PRICE STREAK: MASSIVE LIQUIDATION MARKET CRASH (Lose 70% to 90% value)
         percentMovement = -(0.70 + (Math.random() * 0.20));
+        flatShockBonus = 0;
         stock.upStreak = 0; // Flash reset streak counter
     } else {
-        // Unhinged flat-market background noise (Up to ±20% wild swings per minute)
-        percentMovement = (Math.random() * 0.20) * stock.modifier * (Math.random() > 0.5 ? 1 : -1);
+        // Regular unhinged base market noise (Up to ±20% wild swings per minute)
+        const isUpTick = Math.random() > 0.5;
+        percentMovement = Math.random() * 0.20 * stock.modifier;
+        if (!isUpTick) {
+            percentMovement = -percentMovement;
+        }
+        flatShockBonus = 0;
     }
 
-    // Apply compounding percentage movement calculation
-    let targetPrice = stock.price * (1 + percentMovement);
+    // Apply compounding percentage movement alongside flat shock value injections
+    let targetPrice = (stock.price * (1 + percentMovement)) + flatShockBonus;
 
-    // 🛡️ ECONOMIC LIMIT CEILINGS & FLOORS ($10.00 to $4,000.00)
+    // 🛡️ ENFORCE CEILING & FLOOR LIMITS ($10.00 to $4,000.00)
     if (targetPrice < 10) {
         targetPrice = 10;
     } else if (targetPrice > 4000) {
         targetPrice = 4000;
     }
 
-    // Format new price state and append to active ledger array
+    // Update live state and append to history array ledger
     stock.price = parseFloat(targetPrice.toFixed(2));
     stock.history.push(stock.price);
 
-    // Maintain historical buffer array capacity limits
+    // Maintain capacity limits
     if (stock.history.length > 25) {
         stock.history.shift();
     }
@@ -132,12 +141,10 @@ async function updateMarketBoard(client) {
 }
 
 function startMarketLoop(client) {
-    // Initial delayed boot trigger loop
     setTimeout(() => {
         updateMarketBoard(client);
     }, 5000);
 
-    // Persistent 60-second execution interval ticker
     setInterval(() => {
         updateMarketBoard(client);
     }, 60000);
