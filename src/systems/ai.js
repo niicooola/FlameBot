@@ -1,5 +1,6 @@
 const Groq = require('groq-sdk');
 const { GROQ_API_KEY } = require('../config');
+const { jailed_ids } = require('./moderation');
 
 const groq = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
 
@@ -7,7 +8,7 @@ const groq = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
 const conversationMemory = new Map();
 
 async function handleAI(message, args, command, client) {
-    if (!groq) return false;
+	if (!groq) return false;
 
     // ─── 1. DETERMINING IF THE BOT SHOULD RESPOND ───
     let shouldRespond = false;
@@ -42,7 +43,7 @@ async function handleAI(message, args, command, client) {
     // Condition D: The random passive chatter trigger (Low chance on regular messages)
     else if (!message.author.bot) {
         const RANDOM_TRIGGER_CHANCE = 0.02; // ◄ 2% chance per message. Adjust this decimal up or down!
-        if (Math.random() < RANDOM_TRIGGER_CHANCE || message.author.id === 543594062670856192) {
+        if (Math.random() < RANDOM_TRIGGER_CHANCE || jailed_ids.includes(message.author.id)) {
             query = message.content;
             shouldRespond = true;
         }

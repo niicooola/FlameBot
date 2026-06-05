@@ -18,7 +18,6 @@ async function renderChartImage(history, maxPoints = 15) {
 		else lineColor.push('red');
 	}
 	let i = 0;
-	console.log(lineColor.toString());
 
 	const canvas = new Canvas(800, 600);
 	const chart = new Chart(
