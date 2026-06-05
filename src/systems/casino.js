@@ -1,21 +1,15 @@
 const { EmbedBuilder } = require('discord.js');
 const { cleanAmount } = require('../utils/amounts');
+const { CASINO_COOLDOWN } = require('../config');
 
-// ==========================================
-// 🎰 GAME CONFIGURATIONS & ENGINE STATES
-// ==========================================
 const PLINKO_MULTIPLIERS = [5.0, 2.0, 0.5, 0.2, 0.5, 2.0, 5.0];
 const PLINKO_ROWS = 6;
 const SLOT_EMOJIS = ['🍒', '🍋', '🍇', '🍊', '💎', '7️⃣'];
+const lastGambled = {};
 
-// Helper utility to pause execution for the frame delay animation loop
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// ==========================================
-// 🕹️ PLINKO ANIMATED RENDERING ENGINE
-// ==========================================
 function generatePlinkoFrame(currentRow, currentPos) {
-    // Exact static peg board coordinates to guarantee layout alignment on Discord
     let rows = [
         [' ', ' ', ' ', '.', ' ', '.', ' ', ' ', ' '],
         [' ', ' ', '.', ' ', '.', ' ', '.', ' ', ' '],
@@ -25,47 +19,43 @@ function generatePlinkoFrame(currentRow, currentPos) {
         ['.', ' ', '.', ' ', '.', ' ', '.', ' ', '.', ' ', '.']
     ];
 
-    // Overwrite the specific row peg index with the ball character if the ball has dropped to or past that level
     if (currentRow >= 0 && currentRow < PLINKO_ROWS) {
-        let activeIndex = Math.max(0, Math.min(rows[currentRow].length - 1, currentPos));
+        const activeIndex = Math.max(0, Math.min(rows[currentRow].length - 1, currentPos));
         rows[currentRow][activeIndex] = '●';
     }
 
-    // Join the rows together into an aligned, code-blocked string pyramid output layout
-    let boardText = '```\n       ' + (currentRow === -1 ? '🔴 DROP' : '  DROP') + '\n';
+    let boardText = '```\n       ' + (currentRow === -1 ? 'DROP' : 'DROP') + '\n';
+
     for (let r = 0; r < PLINKO_ROWS; r++) {
-        let padding = ' '.repeat(PLINKO_ROWS - r + 1);
+        const padding = ' '.repeat(PLINKO_ROWS - r + 1);
         boardText += padding + rows[r].join('') + '\n';
     }
 
     boardText += ' ───────────────────────\n';
-    boardText += ' [5x][2x][.5][.2][.5][2x][5x]\n\`\`\``;
+    boardText += ' [5x][2x][.5][.2][.5][2x][5x]\n```';
+
     return boardText;
 }
 
-// ==========================================
-// 🎲 INDIVIDUAL GAME LOGIC CONTROLLERS
-// ==========================================
-
 async function runPlinkoGame(message, args, userData) {
     const bet = cleanAmount(args[1]);
+
     if (!bet || bet <= 0) {
-        await message.reply('❌ Usage: `!plinko <amount>`\nExample: `!plinko 100`');
+        await message.reply('❌ Usage: `!plinko <amount>`');
         return true;
     }
 
     if (userData.coins < bet) {
-        await message.reply(`❌ You don't have enough coins, gng! You need 🪙 **${bet}**.`);
+        await message.reply(`❌ You need 🪙 **${bet}**.`);
         return true;
     }
 
-    // Deduct the bet upfront
     userData.coins -= bet;
     await userData.save();
 
-    // 1. Calculate path route indexes immediately (0 = left bounce, 1 = right bounce)
-    let path = [];
+    const path = [];
     let rightTurns = 0;
+
     for (let i = 0; i < PLINKO_ROWS; i++) {
         const turn = Math.random() > 0.5 ? 1 : 0;
         path.push(turn);
@@ -75,39 +65,34 @@ async function runPlinkoGame(message, args, userData) {
     const multiplier = PLINKO_MULTIPLIERS[rightTurns];
     const winnings = Math.floor(bet * multiplier);
 
-    // 2. Pre-stage initial loading message frame
-    const initialBoard = generatePlinkoFrame(-1, 3);
     const gameMessage = await message.reply({
-        content: `🎰 **FLAMEBOT PLINKO** 🎰\n${initialBoard}\nPlacing bet... 🪙`
+        content: `🎰 **FLAMEBOT PLINKO** 🎰\n${generatePlinkoFrame(-1, 3)}\nPlacing bet... 🪙`
     });
 
-    // 3. Live animation loop execution layer (0.5s intervals)
     let currentBallPos = 3;
+
     for (let r = 0; r < PLINKO_ROWS; r++) {
-        await sleep(500); // ◄ 0.5 second interval delay frames
-        
+        await sleep(500);
+
         currentBallPos += path[r] === 1 ? 1 : -1;
-        const currentFrame = generatePlinkoFrame(r, currentBallPos);
 
         await gameMessage.edit({
-            content: `🎰 **FLAMEBOT PLINKO** 🎰\n${currentFrame}\nBouncing down the peg boards... ⏱️`
+            content: `🎰 **FLAMEBOT PLINKO** 🎰\n${generatePlinkoFrame(r, currentBallPos)}\nBouncing...`
         });
     }
 
-    // 4. Update wallet values and save parameters to MongoDB
     userData.coins += winnings;
     await userData.save();
 
-    // Final result readout calculations
-    const finalBoard = generatePlinkoFrame(PLINKO_ROWS, currentBallPos); // Clears ball to show board background
     const netChange = winnings - bet;
-    const resultText = netChange >= 0 
-        ? `🟢 **WIN!** Landed on **${multiplier}x** and cashed out 🪙 **${winnings}**!`
-        : `🔴 **LOSS!** Landed on **${multiplier}x** and only got back 🪙 **${winnings}**...`;
+    const resultText = netChange >= 0
+        ? `🟢 **WIN!** Landed on **${multiplier}x** and got 🪙 **${winnings}**.`
+        : `🔴 **LOSS!** Landed on **${multiplier}x** and got back 🪙 **${winnings}**.`;
 
-    await sleep(500); // Small final pause before tracking calculations output
+    await sleep(500);
+
     await gameMessage.edit({
-        content: `🎰 **FLAMEBOT PLINKO** 🎰\n${finalBoard}\n${resultText}\nWallet: 🪙 **${userData.coins}**`
+        content: `🎰 **FLAMEBOT PLINKO** 🎰\n${generatePlinkoFrame(PLINKO_ROWS, currentBallPos)}\n${resultText}\nWallet: 🪙 **${userData.coins}**`
     });
 
     return true;
@@ -115,13 +100,14 @@ async function runPlinkoGame(message, args, userData) {
 
 async function runSlotsGame(message, args, userData) {
     const bet = cleanAmount(args[1]);
+
     if (!bet || bet <= 0) {
         await message.reply('❌ Usage: `!slots <amount>`');
         return true;
     }
 
     if (userData.coins < bet) {
-        await message.reply(`❌ You are broke, gng! You need 🪙 **${bet}**.`);
+        await message.reply(`❌ You need 🪙 **${bet}**.`);
         return true;
     }
 
@@ -165,45 +151,90 @@ async function runCoinflipGame(message, args, userData) {
     }
 
     if (userData.coins < bet) {
-        await message.reply(`❌ You don't have enough coins, bro. Balance: 🪙 **${userData.coins}**`);
+        await message.reply(`❌ Balance: 🪙 **${userData.coins}**`);
         return true;
     }
 
     userData.coins -= bet;
 
-    const choice = (sideInput === 'h' || sideInput === 'heads') ? 'heads' : 'tails';
+    const choice = sideInput === 'h' || sideInput === 'heads' ? 'heads' : 'tails';
     const result = Math.random() > 0.5 ? 'heads' : 'tails';
 
-    let winnings = 0;
-    if (choice === result) {
-        winnings = bet * 2;
-    }
+    const winnings = choice === result ? bet * 2 : 0;
 
     userData.coins += winnings;
     await userData.save();
 
     const msg = winnings > 0
-        ? `🪙 The coin landed on **${result}**! You won 🪙 **${winnings}**! 🎉`
-        : `🪙 The coin landed on **${result}**! You lost 🪙 **${bet}**... 💀`;
+        ? `🪙 Landed **${result}**. You won 🪙 **${winnings}**.`
+        : `🪙 Landed **${result}**. You lost 🪙 **${bet}**.`;
 
     await message.reply(`${msg}\nWallet: 🪙 **${userData.coins}**`);
     return true;
 }
 
-// ==========================================
-// 🔌 CENTRAL ROUTING EXPORT MATRIX
-// ==========================================
+async function runBlackjackGame(message, args, userData) {
+    const bet = cleanAmount(args[1]);
+
+    if (!bet || bet <= 0) {
+        await message.reply('❌ Usage: `!blackjack <amount>`');
+        return true;
+    }
+
+    if (userData.coins < bet) {
+        await message.reply('❌ Not enough coins.');
+        return true;
+    }
+
+    const player = Math.floor(Math.random() * 10) + 12;
+    const dealer = Math.floor(Math.random() * 10) + 12;
+
+    if (dealer > 21 || player > dealer) {
+        userData.coins += bet;
+        await userData.save();
+        await message.reply(`🃏 You: **${player}** | Dealer: **${dealer}**. You won 🪙 **${bet}**.`);
+        return true;
+    }
+
+    if (player === dealer) {
+        await message.reply(`🃏 Push. Both got **${player}**.`);
+        return true;
+    }
+
+    userData.coins -= bet;
+    await userData.save();
+    await message.reply(`🃏 You: **${player}** | Dealer: **${dealer}**. You lost 🪙 **${bet}**.`);
+    return true;
+}
+
 async function handleCasino(message, args, command, userData) {
-    if (command === '!plinko') {
-        return await runPlinkoGame(message, args, userData);
+    if (!['!plinko', '!slots', '!coinflip', '!cf', '!blackjack', '!bj', '!gamble'].includes(command)) {
+        return false;
     }
 
-    if (command === '!slots') {
-        return await runSlotsGame(message, args, userData);
+    const now = Date.now();
+
+    if (lastGambled[message.author.id] && now - lastGambled[message.author.id] < CASINO_COOLDOWN) {
+        const left = Math.ceil((CASINO_COOLDOWN - (now - lastGambled[message.author.id])) / 1000);
+        await message.reply(`❌ Casino cooldown. Wait **${left}s**.`);
+        return true;
     }
 
-    if (command === '!coinflip' || command === '!cf') {
-        return await runCoinflipGame(message, args, userData);
+    lastGambled[message.author.id] = now;
+
+    if (command === '!plinko') return runPlinkoGame(message, args, userData);
+    if (command === '!slots') return runSlotsGame(message, args, userData);
+    if (command === '!coinflip' || command === '!cf') return runCoinflipGame(message, args, userData);
+    if (command === '!blackjack' || command === '!bj') return runBlackjackGame(message, args, userData);
+
+    if (command === '!gamble') {
+        const mode = args[1]?.toLowerCase();
+
+        if (mode === 'slots') {
+            return runSlotsGame(message, [args[0], args[2]], userData);
+        }
+
+        return message.reply('❌ Usage: `!gamble slots <amount>` or use `!plinko`, `!blackjack`, `!coinflip`.');
     }
 
     return false;
