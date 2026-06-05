@@ -48,13 +48,13 @@ async function renderMarketBoardEmbed() {
 async function updateMarketBoard(client) {
     const stock = marketTickersState['$FLME'];
 
-    // Cache the previous interval price as the open baseline
+    // Cache the previous interval price as the open baseline before doing calculations
     stock.minuteOpen = stock.price;
 
     let percentMovement = 0;
     const historyLen = stock.history.length;
 
-    // 🏎️ TREND ANALYSIS LOGIC STEP: Compare past actual closes to compute active streaks
+    // 🏎️ TREND ANALYSIS LOGIC STEP: Compare past actual closes inside the array
     if (historyLen >= 2) {
         const standardLast = stock.history[historyLen - 1];
         const standardPrev = stock.history[historyLen - 2];
@@ -66,13 +66,13 @@ async function updateMarketBoard(client) {
             stock.upStreak++;
             stock.downStreak = 0; // Break consecutive losses
         } else {
-            // Flatline edge case: clear streaks to prevent stuck calculations
+            // Flatline edge case: clear streaks to prevent stuck states
             stock.upStreak = 0;
             stock.downStreak = 0;
         }
     }
 
-    // 💥 HIGH-VOLATILITY THRESHOLD EVALUATOR (HARD-TRIGGER AT 2 STEPS)
+    // 💥 HIGH-VOLATILITY DEGENERACY ENGINE (TRIGGERS AT 2 STEPS)
     if (stock.downStreak >= 2) {
         // 🚀 2 LOSSES IN A ROW: PARABOLIC SHORT SQUEEZE PUMP (Gain 100% to 300% value)
         percentMovement = 1.0 + (Math.random() * 2.0);
@@ -89,7 +89,7 @@ async function updateMarketBoard(client) {
     // Apply compounding percentage movement calculation
     let targetPrice = stock.price * (1 + percentMovement);
 
-    // 🛡️ ECONOMIC SANITY LIMIT CEILINGS & FLOORS ($10.00 to $4,000.00)
+    // 🛡️ ECONOMIC LIMIT CEILINGS & FLOORS ($10.00 to $4,000.00)
     if (targetPrice < 10) {
         targetPrice = 10;
     } else if (targetPrice > 4000) {
