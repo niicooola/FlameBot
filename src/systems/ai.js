@@ -1,16 +1,28 @@
 const Groq = require('groq-sdk');
 const { GROQ_API_KEY } = require('../config');
 const { jailed_ids } = require('./moderation');
+const { isAdmin } = require('../utils/permissions');
+const { MAINTAINER_USER_ID } = require('../config');
 
 const groq = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
+let enable_ai = true;
 
 const conversationMemory = new Map();
 
 async function handleAI(message, args, command, client) {
-    if (!groq) return false;
+    if (!groq || !enable_ai) return false;
 
     let shouldRespond = false;
     let query = '';
+	
+	if (command === '!toggle_ai') {
+		if (isAdmin(message.author) || message.author.id == MAINTAINER_USER_ID) {
+			await message.reply('Missing permissions');
+			enable_ai = !enable_ai; 
+			return true;
+		}
+		return false;
+	}
 
     if (command === '!ask') {
         query = args.slice(1).join(' ');

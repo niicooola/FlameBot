@@ -62,8 +62,7 @@ module.exports = function(client) {
             const command = contentHasPrefix ? args[0].toLowerCase() : null;
 			
 			// ─── 2. IF NO PREFIX, STOP AND GIVE CHAT XP ───
-            if (!contentHasPrefix || command === '!ask') {
-                const handledAI = await handleAI(message, args, command, client); 
+            if (!contentHasPrefix) { 
                 await applyXpAndCoins(message, userData, 2);
                 return;
             }
@@ -86,6 +85,7 @@ module.exports = function(client) {
             if (await handleProfile(message, args, command, userData)) return;
             if (await handleTasks(message, args, command, userData)) return;
             if (await handleServerTools(message, args, command, userData)) return;
+			if (await handleAI(message, args, command, client)) return;
 
             return message.reply('❌ Unknown command. Use `!help`.');
         } catch (err) {
