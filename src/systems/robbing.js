@@ -56,11 +56,16 @@ async function handleRobbing(message, args, command) {
             return message.reply(`❌ <@${target.id}> does not have enough coins to be worth targeting.`);
         }
 
-        const victimShields = victimData.inventory ? (victimData.inventory['shield'] || 0) : 0;
+        // Fixed array search lookup to check if user owns a protection shield item
+        const hasShieldActive = victimData.inventory.includes('shield');
 
-        if (victimShields > 0) {
-            victimData.inventory['shield'] = victimShields - 1;
-            victimData.markModified('inventory');
+        if (hasShieldActive) {
+            // Remove exactly one shield from the inventory array matrix
+            const shieldIndex = victimData.inventory.indexOf('shield');
+            if (shieldIndex > -1) {
+                victimData.inventory.splice(shieldIndex, 1);
+            }
+            
             await victimData.save();
 
             robberData.lastRobbed = now;
@@ -126,7 +131,7 @@ async function handleRobbing(message, args, command) {
 
                 const successEmbed = new EmbedBuilder()
                     .setColor('#00FF00')
-                    .setTitle(`✅ Successful ${mode.name}!`)
+                    .setTitle(`¼ Successful ${mode.name}!`)
                     .setDescription(
                         `💰 <@${message.author.id}> pulled off the heist against <@${target.id}>!\n\n` +
                         `• **Strategy Used:** ${mode.name}\n` +
