@@ -7,16 +7,17 @@ async function handleHelp(message, args, command) {
 
     const pages = {
         economy: '`!bal`, `!daily`, `!work`, `!pay`, `!leaderboard`',
-        casino: '`!coinflip`, `!blackjack`, `!gamble`',
+        casino: '`!coinflip`, `!blackjack`, `!gamble slots`, `!roulette` (or `!rr`)',
         market: '`!market`, `!stock`, `!portfolio`, `!buyshares`, `!sellshares`',
         fun: '`!8ball`, `!rps`, `!roll`, `!choose`, `!coin`, `!dice`, `!poll`, `!bananabread`',
         info: '`!stats`, `!rank`, `!serverinfo`, `!whois`, `!avatar`, `!ping`, `!uptime`, `!botinfo`, `!membercount`, `!channelinfo`, `!links`',
         shop: '`!shop`, `!buy`',
-        mod: '`!warn`, `!mute`, `!kick`, `!ban`, `!clear`, `!slowmode`, `!lockchannel`',
+        mod: '`!warn`, `!mute`, `!kick`, `!ban`, `!clear`, `!slowmode`, `!lockchannel`, `!jail`, `!unjail`, `!listjail`',
         ai: '`!ask`',
         profile: '`!profile`, `!setbio`, `!badges`, `!inventory`',
         tasks: '`!todo`, `!notes`',
-        server: '`!rules`, `!roles`, `!serverlinks`, `!report`'
+        server: '`!rules`, `!roles`, `!serverlinks`, `!report`, `!afk`',
+        admin: '`!givecoins`, `!takecoins`, `!resetcooldown`, `!setstock`, `!givestock`, `!addcoins`, `!removecoins`, `!setcoins`, `!resetcoins`, `!baltable`, `!backupjson`'
     };
 
     if (page && pages[page]) {
@@ -45,7 +46,8 @@ async function handleHelp(message, args, command) {
                     { name: '🏪 Shop', value: '`!help shop`', inline: true },
                     { name: '🛡️ Mod', value: '`!help mod`', inline: true },
                     { name: '🤖 AI', value: '`!help ai`', inline: true },
-                    { name: '👤 Profile', value: '`!help profile`', inline: true }
+                    { name: '👤 Profile', value: '`!help profile`', inline: true },
+                    { name: '👑 Admin Matrix', value: '`!help admin`', inline: true }
                 )
         ]
     });
