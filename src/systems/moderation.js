@@ -33,7 +33,7 @@ async function handleModeration(message, args, command) {
         return true;
     }
 
-    if (command === '!warn') {
+  if (command === '!warn') {
         if (!isStaff(message.member)) return message.reply('❌ Staff only.');
 
         const target = message.mentions.members.first();
@@ -50,7 +50,7 @@ async function handleModeration(message, args, command) {
         data.warnings += 1;
         await data.save();
 
-        await target.send(`⚠️ Warning in **${message.guild.name}**\nReason: ${reason}\nWarnings: ${data.warnings}/3`).catch(() => {});
+        // ⚠️ Removed target.send to stop the DMs
         await message.channel.send(`⚠️ ${target} warned. Count: **${data.warnings}/3**.`);
 
         const embed = new EmbedBuilder()
@@ -63,16 +63,18 @@ async function handleModeration(message, args, command) {
                 { name: 'Total Strikes', value: `${data.warnings}/3`, inline: true }
             );
 
-        await dmServerLeadership(message.guild, embed);
+        // 🚀 RAGEBAIT UPDATE: Fetch the log channel and ping the admin role
+        const logChannel = await message.guild.channels.fetch('1509036326672928778');
+        if (logChannel) {
+            await logChannel.send({ content: '@admin', embeds: [embed] });
+        }
 
         // ─── 🛡️ HOV'S PATHTRIGGER SECURITY FIX ───
         if (data.warnings >= 3) {
-            // Check if the commander has full Mod permissions required to execute a kick
             if (!isMod(message.member)) {
-                return message.channel.send(`⚠️ <@${target.id}> has reached **3 warnings**, but a full Mod or Admin must review this case because Trial Mods cannot trigger automated kicks.`);
+                return message.channel.send(`⚠️ <@${target.id}> has reached **3 warnings**, but a full Mod or Admin must review this case.`);
             }
 
-            // Double check bot permission safety grid
             if (target.kickable) {
                 await target.kick('Auto-moderation: Accumulated 3 active server warnings.');
                 data.warnings = 0;
