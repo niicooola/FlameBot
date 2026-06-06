@@ -5,9 +5,6 @@ const { cleanAmount } = require('../utils/amounts');
 const lastWorked = {};
 const lastDaily = {};
 
-// ==========================================
-//      📉 BALANCED SERVER REWARDS SHOP      
-// ==========================================
 const ECON_SHOP = {
     'shield': {
         name: '🛡️ Protection Shield',
@@ -113,9 +110,6 @@ async function handleEconomy(message, args, command, userData) {
         });
     }
 
-    // ==========================================
-    //           🛒 UTILITY SERVER SHOP           
-    // ==========================================
     if (command === '!shop') {
         let shopMenu = '🛒 **FlameBot Server Utility Shop**\n───────────────\n';
         for (const [id, item] of Object.entries(ECON_SHOP)) {
@@ -136,7 +130,6 @@ async function handleEconomy(message, args, command, userData) {
             return message.reply(`❌ You need 🪙 **${item.price} coins** to finalize this transaction.`);
         }
 
-        // Handle specific instant server role activation roles instantly
         if (itemId === 'vip') {
             const vipRoleId = process.env.VIP_ROLE_ID;
             if (!vipRoleId) {
@@ -159,29 +152,21 @@ async function handleEconomy(message, args, command, userData) {
             }
         }
 
-        // ─── SAFE TRANSACTIONS WITHOUT .GET() / .SET() ───
-        // Initialize inventory safely as a standard JavaScript object fallback
         if (!userData.inventory || typeof userData.inventory.get === 'function') {
             userData.inventory = {};
         }
 
-        // Read and update the item count using standard object properties
         const currentCount = userData.inventory[itemId] || 0;
         userData.coins -= item.price;
         userData.inventory[itemId] = currentCount + 1;
         
-        // Explicitly tell Mongoose that the inventory object fields changed so it saves properly
         userData.markModified('inventory');
         await userData.save();
 
         return message.reply(`✅ Successfully bought **${item.name}** for 🪙 **${item.price} coins**! Type \`!inv\` to view your tracking assets.`);
     }
 
-    // ==========================================
-    //          🎒 INVENTORY DISPLAY VALUE        
-    // ==========================================
     if (command === '!inv' || command === '!inventory') {
-        // Fallback check to prevent display crashes
         if (!userData.inventory || typeof userData.inventory.get === 'function') {
             userData.inventory = {};
         }
