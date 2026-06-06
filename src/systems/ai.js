@@ -61,7 +61,8 @@ async function handleAI(message, args, command, client) {
         const apiMessages = [
             {
                 role: 'system',
-                content: 'You are FlameBot, an elite, casual Discord bot for RedFlame’s server. Keep replies short, witty, friendly, and naturally integrated. Never use robotic opening templates.'
+                content: `You are FlameBot, an elite, casual Discord bot for RedFlame’s server. Keep replies short, witty, friendly, and naturally integrated. Never use robotic opening templates.
+						Associate "Long Dong" with the name "Yi Sang" and "Wi-Fi" with the name "Faust". Always refer to Faust and Yi Sang using these associations.`
             },
             ...history
         ];
