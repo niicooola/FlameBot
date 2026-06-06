@@ -7,15 +7,6 @@ const { enableLogs, disableLogs, logsEnabled, dmServerLeadership } = require('..
 const { client } = require('../client');
 let jailed_ids = [];
 
-const { EmbedBuilder } = require('discord.js');
-const { MUTE_ROLE_ID } = require('../config');
-const User = require('../models/User');
-const { cleanAmount } = require('../utils/amounts');
-const { isStaff, isMod, isAdmin } = require('../utils/permissions');
-const { enableLogs, disableLogs, logsEnabled, dmServerLeadership } = require('../utils/logging');
-const { client } = require('../client');
-let jailed_ids = [];
-
 async function handleModeration(message, args, command) {
     if (command === '!enablelogs') {
         if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
@@ -72,10 +63,14 @@ async function handleModeration(message, args, command) {
                 { name: 'Total Strikes', value: `${data.warnings}/3`, inline: true }
             );
 
-        // 🚀 RAGEBAIT UPDATE: Fetch the log channel and ping the admin role
-        const logChannel = await message.guild.channels.fetch('1509036326672928778');
-        if (logChannel) {
-            await logChannel.send({ content: '<@&1474953218243957029>', embeds: [embed] });
+        // 🚀 RAGEBAIT UPDATE: Fetch the log channel and ping the admin role safely
+        try {
+            const logChannel = await message.guild.channels.fetch('1509036326672928778');
+            if (logChannel) {
+                await logChannel.send({ content: '<@&1474953218243957029>', embeds: [embed] });
+            }
+        } catch (err) {
+            console.error("Failed to route log channel message:", err);
         }
 
         // ─── 🛡️ HOV'S PATHTRIGGER SECURITY FIX ───
@@ -201,45 +196,3 @@ async function handleModeration(message, args, command) {
     }
 
     if (command === '!unlockchannel') {
-        if (!isMod(message.member)) return message.reply('❌ Mod only.');
-        await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: null });
-        return message.reply('🔓 Channel unlocked.');
-    }
-    
-    if (command === '!jail') {
-        if (!isAdmin(message.member)) return message.reply('Admins only.');
-        const target = message.mentions.members.first();
-        if (!target) return message.reply('Mention a user.');
-        if (jailed_ids.includes(target.id)) return message.reply('User is already jailed');
-        jailed_ids.push(target.id);
-        return message.reply(`${target.user.username} has been jailed`);
-    }
-    
-    if (command === '!unjail') {
-        if (!isAdmin(message.member)) return message.reply('Admins only.');
-        const target = message.mentions.members.first();
-        if (!target) return message.reply('Mention a user.');
-        if (!jailed_ids.includes(target.id)) return message.reply('User is not jailed');
-        const index = jailed_ids.indexOf(target.id);
-        if (index > -1) { 
-            jailed_ids.splice(index, 1); 
-        }
-        return message.reply(`${target.user.username} has been unjailed`);
-    }
-    
-    if (command === '!listjail') {
-        if (!isAdmin(message.member)) return message.reply('Admins only.');
-        if (jailed_ids.length < 1) return message.reply('No one is currently jailed');
-        let res = 'Jailed accounts: ';
-        for (const el of jailed_ids) {
-            const jailee = await client.users.fetch(el);
-            res += jailee.username + ', ';
-        }
-        return message.reply(res.slice(0,-2));
-    }
-
-    return false;
-}
-
-module.exports = { handleModeration, jailed_ids };
-module.exports = { handleModeration, jailed_ids };
