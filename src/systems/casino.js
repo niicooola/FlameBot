@@ -35,8 +35,7 @@ function generatePlinkoFrame(currentRow, currentPos) {
     }
 
     boardText += ' ───────────────────────\n';
-    boardText += ' [5x][2x][.5][.2][.5][2x][5x]\n
-```';
+    boardText += ' [5x][2x][.5][.2][.5][2x][5x]\n';
 
     return boardText;
 }

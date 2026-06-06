@@ -6,15 +6,15 @@ async function handleServerTools(message, args, command) {
             '📜 **Server Rules**\n' +
             '1. No harassment or hate speech.\n' +
             '2. No spam or encouraging spam.\n' +
-            '3. Do not ping staff. The only acceptable time to ping @Mod or @Admin is if you need assistance and have already dm'ed them and explained your need (subject to change)\n' +
+            '3. Do not ping staff. The only acceptable time to ping @Mod or @Admin is if you need assistance and have already dm\'ed them and explained your need (subject to change)\n' +
             '4. No threats of violence or S/A toward any member. While this can be thought of as the same as rule 1, i would like to create a seperate rule to ensure no members are uncomfortable\n' +
-            '5. Keep all promotion material to ⁠《✧》self-promo《✧》\n'
-            '6. Edgy jokes are fine but stay well within the line of allowed/not allowed\n'
-            '7. Absolutely no slurs! This applies to everyone but flame bc i cant ban him\n'
-            '8. No NSFW Imagery or videos ETC. if you MUST use an nsfw image or video put a spoiler tag on it AND no porn/sexual imagery ever\n'
-            '9. This is a very unpolitic server. If you must talk about Politics keep it respectful and according to other rules\n'
-            '10. No talking about mixing baked beans and maple syrup (iykyk)\n'
-            '11. no being british, it is punishable by British role\n'
+            '5. Keep all promotion material to ⁠《✧》self-promo《✧》\n'+
+            '6. Edgy jokes are fine but stay well within the line of allowed/not allowed\n'+
+            '7. Absolutely no slurs! This applies to everyone but flame bc i cant ban him\n'+
+            '8. No NSFW Imagery or videos ETC. if you MUST use an nsfw image or video put a spoiler tag on it AND no porn/sexual imagery ever\n'+
+            '9. This is a very unpolitic server. If you must talk about Politics keep it respectful and according to other rules\n'+
+            '10. No talking about mixing baked beans and maple syrup (iykyk)\n'+
+            '11. no being british, it is punishable by British role\n'+
             '12. Please keep all bot commands in ⁠《✧》flamegpt-commands《✧》or ⁠《✧》flamegpt-commands-2《✧》 '
         );
     }

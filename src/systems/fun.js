@@ -9,7 +9,7 @@ const eightBallAnswers = [
     'Outlook grim.',
     'Ask again later.',
     'Absolutely not.',
-    'Looks good.'
+    'Looks good.',
     'Fuck You!'
 ];
 
