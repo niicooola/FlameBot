@@ -17,7 +17,7 @@ module.exports = {
     SR_MEMBER_ROLE_ID: process.env.SR_MEMBER_ROLE_ID,
 
     CHAT_INCOME: 5,
-    CASINO_COOLDOWN: 30000,
+    CASINO_COOLDOWN: 2500,
 
     VIP_PRICE: 75000,
     BOOSTER_PRICE: 35000,
