@@ -6,7 +6,7 @@ const { handleHelp } = require('../systems/help');
 const { handlePolls } = require('../systems/polls');
 const { handleEconomy } = require('../systems/economy');
 const { handleCasino } = require('../systems/casino');
-const { handleMarket } = require('../systems/market'); // ◄ Restored to standard import
+const { handleMarket } = require('../systems/market');
 const { handleFun } = require('../systems/fun');
 const { handleInfo } = require('../systems/info');
 const { handleShop } = require('../systems/shop');
@@ -64,7 +64,7 @@ module.exports = function(client) {
 			// ─── 2. IF NO PREFIX, STOP AND GIVE CHAT XP ───
             if (!contentHasPrefix) {
                 const handledAI = await handleAI(message, args, command, client); 
-				await applyXpAndCoins(message, userData, 2);
+                await applyXpAndCoins(message, userData, 2);
                 return;
             }
 			
