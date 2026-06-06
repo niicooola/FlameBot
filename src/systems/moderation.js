@@ -39,7 +39,6 @@ async function handleModeration(message, args, command) {
         const target = message.mentions.members.first();
         if (!target) return message.reply('❌ Mention a user.');
 
-        // 🛡️ SECURITY GATE 1: Prevent staff from warning people with equal or higher authority
         if (message.member.roles.highest.position <= target.roles.highest.position) {
             return message.reply("❌ You can't issue a warning to someone with an equal or higher role, bro.");
         }
@@ -50,7 +49,6 @@ async function handleModeration(message, args, command) {
         data.warnings += 1;
         await data.save();
 
-        // ⚠️ Removed target.send to stop the user DMs
         await message.channel.send(`⚠️ ${target} warned. Count: **${data.warnings}/3**.`);
 
         const embed = new EmbedBuilder()
@@ -63,7 +61,6 @@ async function handleModeration(message, args, command) {
                 { name: 'Total Strikes', value: `${data.warnings}/3`, inline: true }
             );
 
-        // 🚀 TARGETED CHANNEL ROUTING: Send directly to the specified log channel and ping the admin role
         try {
             const logChannel = await message.guild.channels.fetch('1509036326672928778');
             if (logChannel) {
@@ -73,7 +70,6 @@ async function handleModeration(message, args, command) {
             console.error("Failed to route log channel message:", err);
         }
 
-        // ─── 🛡️ AUTOMATED ACTION CHECK ───
         if (data.warnings >= 3) {
             if (!isMod(message.member)) {
                 return message.channel.send(`⚠️ <@${target.id}> has reached **3 warnings**, but a full Mod or Admin must review this case.`);
@@ -230,7 +226,7 @@ async function handleModeration(message, args, command) {
             const jailee = await client.users.fetch(el);
             res += jailee.username + ', ';
         }
-        return message.reply(res.slice(0, -2));
+        return message.reply(res.slice(0,-2));
     }
 
     return false;
