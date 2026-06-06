@@ -1,7 +1,7 @@
 module.exports = {
     PREFIX: '!',
     PORT: process.env.PORT || 3000,
-	BRANCH_TEST: process.env.BRANCH_TEST || false,
+    BRANCH_TEST: process.env.BRANCH_TEST || false,
 
     DISCORD_TOKEN: process.env.DISCORD_TOKEN,
     MONGO_URI: process.env.MONGO_URI,
