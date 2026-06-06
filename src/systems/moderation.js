@@ -63,10 +63,11 @@ async function handleModeration(message, args, command) {
                 { name: 'Total Strikes', value: `${data.warnings}/3`, inline: true }
             );
 
-        // 🚀 RAGEBAIT UPDATE: Fetch the log channel and ping the admin role
-        const logChannel = await message.guild.channels.fetch('1509036326672928778');
-        if (logChannel) {
-            await logChannel.send({ content: '@admin', embeds: [embed] });
+      // 🚀 RAGEBAIT UPDATE: Fetch the log channel and ping the admin role
+const logChannel = await message.guild.channels.fetch('1509036326672928778');
+if (logChannel) {
+    await logChannel.send({ content: '<@&1474953218243957029>', embeds: [embed] });
+}
         }
 
         // ─── 🛡️ HOV'S PATHTRIGGER SECURITY FIX ───
