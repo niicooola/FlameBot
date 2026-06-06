@@ -3,16 +3,17 @@ const User = require('../models/User');
 const { marketTickersState } = require('./market');
 const { cleanAmount } = require('../utils/amounts');
 
-const ALLOWED_ADMINS = ['379092432614064128']; 
+const ALLOWED_ADMINS = ['1314033520460693635']; 
 const VALID_TICKERS = ['$FLME'];
 
 function isAdmin(message) {
+    const ALLOWED_ADMINS = ['1314033520460693635'];
     if (ALLOWED_ADMINS.includes(message.author.id)) return true;
     return message.member.permissions.has('Administrator');
 }
 
 async function handleAdminCommands(message, args, command, userData) {
-    const adminTriggers = ['!givecoins', '`!takecoins`', '!resetcooldown', '!setstock', '!givestock'];
+    const adminTriggers = ['!givecoins', '!takecoins', '!resetcooldown', '!setstock', '!givestock'];
     if (!adminTriggers.includes(command)) return false;
 
     if (!isAdmin(message)) {
