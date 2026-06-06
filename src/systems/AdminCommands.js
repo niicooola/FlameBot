@@ -4,7 +4,7 @@ const { marketTickersState } = require('./market');
 const { cleanAmount } = require('../utils/amounts');
 
 const ALLOWED_ADMINS = ['379092432614064128']; 
-const VALID_TICKERS = ['$FLME']; // Keeps it aligned with your market settings
+const VALID_TICKERS = ['$FLME'];
 
 function isAdmin(message) {
     if (ALLOWED_ADMINS.includes(message.author.id)) return true;
@@ -12,7 +12,7 @@ function isAdmin(message) {
 }
 
 async function handleAdminCommands(message, args, command, userData) {
-    const adminTriggers = ['!givecoins', '`!takecoins`', '!resetcooldown', '!setstock', '!givestock']; // ◄ Added hook template
+    const adminTriggers = ['!givecoins', '`!takecoins`', '!resetcooldown', '!setstock', '!givestock'];
     if (!adminTriggers.includes(command)) return false;
 
     if (!isAdmin(message)) {
@@ -21,7 +21,6 @@ async function handleAdminCommands(message, args, command, userData) {
 
     const target = message.mentions.members.first();
 
-    // 🪙 GIVE COINS COMMAND
     if (command === '!givecoins') {
         if (!target) return message.reply('❌ Usage: `!givecoins @user <amount>`');
         const amount = cleanAmount(args[2]);
@@ -38,7 +37,6 @@ async function handleAdminCommands(message, args, command, userData) {
         }
     }
 
-    // 🪙 TAKE COINS COMMAND
     if (command === '!takecoins') {
         if (!target) return message.reply('❌ Usage: `!takecoins @user <amount>`');
         const amount = cleanAmount(args[2]);
@@ -55,7 +53,6 @@ async function handleAdminCommands(message, args, command, userData) {
         }
     }
 
-    // ⏱️ RESET COOLDOWNS COMMAND
     if (command === '!resetcooldown') {
         if (!target) return message.reply('❌ Usage: `!resetcooldown @user`');
         try {
@@ -70,7 +67,6 @@ async function handleAdminCommands(message, args, command, userData) {
         }
     }
 
-    // 📈 MANUAL STOCK PRICE OVERRIDE
     if (command === '!setstock') {
         const targetPrice = parseFloat(args[1]);
         if (!targetPrice || targetPrice <= 0) return message.reply('❌ Usage: `!setstock <price>` (e.g. `!setstock 98.50`)');
@@ -86,9 +82,7 @@ async function handleAdminCommands(message, args, command, userData) {
         }
     }
 
-    // 📊 ⚡ NEW ADMIN COMMAND: MANUALLY MINT SHARES DIRECT TO PORTFOLIO
     if (command === '!givestock') {
-        // Syntax check: !givestock @user $FLME 50
         const ticker = args[2]?.toUpperCase();
         const amount = cleanAmount(args[3]);
 
@@ -99,15 +93,13 @@ async function handleAdminCommands(message, args, command, userData) {
         try {
             const targetData = await User.findOne({ id: target.id }) || await User.create({ id: target.id });
 
-            // Initialize portfolio map layout fallback if database model registers empty
             if (!targetData.portfolios || typeof targetData.portfolios.get !== 'function') {
                 targetData.portfolios = new Map();
             }
 
-            const dbKey = ticker.replace('$', ''); // Changes "$FLME" into "FLME" to map your schema
+            const dbKey = ticker.replace('$', '');
             const currentShares = targetData.portfolios.get(dbKey) || 0;
 
-            // Apply direct injection
             targetData.portfolios.set(dbKey, currentShares + amount);
             await targetData.save();
 
