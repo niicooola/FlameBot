@@ -62,7 +62,7 @@ module.exports = function(client) {
             const command = contentHasPrefix ? args[0].toLowerCase() : null;
 			
 			// ─── 2. IF NO PREFIX, STOP AND GIVE CHAT XP ───
-            if (!contentHasPrefix) {
+            if (!contentHasPrefix || command === '!ask') {
                 const handledAI = await handleAI(message, args, command, client); 
                 await applyXpAndCoins(message, userData, 2);
                 return;
