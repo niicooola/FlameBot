@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const User = require('../models/User');
 
-const ROB_COOLDOWN = 45 * 60 * 1000; // 45 Minutes
+const ROB_COOLDOWN = 45 * 60 * 1000;
 const MIN_COINS_REQUIRED = 300;
 
 const ROBBERY_MODES = {
@@ -40,7 +40,6 @@ async function handleRobbing(message, args, command) {
         const robberData = await User.findOne({ id: message.author.id }) || await User.create({ id: message.author.id });
         const victimData = await User.findOne({ id: target.id }) || await User.create({ id: target.id });
 
-        // ─── 1. COOLDOWN CHECK ───
         const now = new Date();
         if (robberData.lastRobbed) {
             const timePassed = now - new Date(robberData.lastRobbed);
@@ -50,7 +49,6 @@ async function handleRobbing(message, args, command) {
             }
         }
 
-        // ─── 2. BALANCE CHECK ───
         if (robberData.coins < MIN_COINS_REQUIRED) {
             return message.reply(`❌ You need at least 🪙 **${MIN_COINS_REQUIRED}** coins to plan a robbery.`);
         }
@@ -58,17 +56,13 @@ async function handleRobbing(message, args, command) {
             return message.reply(`❌ <@${target.id}> does not have enough coins to be worth targeting.`);
         }
 
-        // ─── 🛡️ NEW FIXED GATE: ACTIVE PROTECTION SHIELD CHECK ───
-        // Safely checks if victim inventory object exists and contains a shield count higher than 0
         const victimShields = victimData.inventory ? (victimData.inventory['shield'] || 0) : 0;
 
         if (victimShields > 0) {
-            // 1. Break 1 shield from the victim's asset allocation inventory map
             victimData.inventory['shield'] = victimShields - 1;
             victimData.markModified('inventory');
             await victimData.save();
 
-            // 2. Slap the robber with the cooldown anyway for attempting the heist
             robberData.lastRobbed = now;
             await robberData.save();
 
@@ -84,7 +78,6 @@ async function handleRobbing(message, args, command) {
             return message.channel.send({ embeds: [shieldEmbed] });
         }
 
-        // ─── 3. CREATE INTERACTIVE ACTION MENUS IF GATES CLEAR ───
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('rob_pickpocket').setLabel('🥷 Pickpocket (70%)').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId('rob_grandtheft').setLabel('💰 Grand Theft (45%)').setStyle(ButtonStyle.Primary),
@@ -113,11 +106,9 @@ async function handleRobbing(message, args, command) {
             const mode = ROBBERY_MODES[interaction.customId];
             if (!mode) return;
 
-            // Fresh database profile fetch at action execution point
             const activeRobber = await User.findOne({ id: message.author.id });
             const activeVictim = await User.findOne({ id: target.id });
 
-            // Lock the final robbery cooldown timestamp
             activeRobber.lastRobbed = new Date();
 
             const roll = Math.random();
