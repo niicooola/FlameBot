@@ -196,3 +196,44 @@ async function handleModeration(message, args, command) {
     }
 
     if (command === '!unlockchannel') {
+        if (!isMod(message.member)) return message.reply('❌ Mod only.');
+        await message.channel.permissionOverwrites.edit(message.guild.roles.everyone, { SendMessages: null });
+        return message.reply('🔓 Channel unlocked.');
+    }
+    
+    if (command === '!jail') {
+        if (!isAdmin(message.member)) return message.reply('Admins only.');
+        const target = message.mentions.members.first();
+        if (!target) return message.reply('Mention a user.');
+        if (jailed_ids.includes(target.id)) return message.reply('User is already jailed');
+        jailed_ids.push(target.id);
+        return message.reply(`${target.user.username} has been jailed`);
+    }
+    
+    if (command === '!unjail') {
+        if (!isAdmin(message.member)) return message.reply('Admins only.');
+        const target = message.mentions.members.first();
+        if (!target) return message.reply('Mention a user.');
+        if (!jailed_ids.includes(target.id)) return message.reply('User is not jailed');
+        const index = jailed_ids.indexOf(target.id);
+        if (index > -1) { 
+            jailed_ids.splice(index, 1); 
+        }
+        return message.reply(`${target.user.username} has been unjailed`);
+    }
+    
+    if (command === '!listjail') {
+        if (!isAdmin(message.member)) return message.reply('Admins only.');
+        if (jailed_ids.length < 1) return message.reply('No one is currently jailed');
+        let res = 'Jailed accounts: ';
+        for (const el of jailed_ids) {
+            const jailee = await client.users.fetch(el);
+            res += jailee.username + ', ';
+        }
+        return message.reply(res.slice(0,-2));
+    }
+
+    return false;
+}
+
+module.exports = { handleModeration, jailed_ids };
