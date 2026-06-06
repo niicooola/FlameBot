@@ -18,27 +18,9 @@ const marketTickersState = {
 
 async function renderMarketBoardEmbed() {
     const stock = marketTickersState['$FLME'];
-	const attachment = await renderTrendGraph(stock.history);
-
-    /*const embed = new EmbedBuilder()
-        .setColor(stock.price >= stock.minuteOpen ? '#00FF00' : '#FF0000') // ◄ Color dynamically tracks the last interval cycle change
-        .setTitle('📈 FlameBot Exchange')
-        .setDescription(
-            `**$FLME**\n` +
-            `💰 Price: **$${stock.price.toFixed(2)}**\n` +
-            `⚙️ Stability Mode: **ON**`
-        )
-        .addFields({
-            name: '📊 Stable Performance Matrix',
-            value: `\`\`\`\n${renderTrendGraph(stock.history)}\n\`\`\``
-        })
-		.setImage('attachment://image.png')
-        .setFooter({
-            text: '!market | !portfolio | !buyshares | !sellshares'
-        })
-        .setTimestamp();*/
+    const attachment = await renderTrendGraph(stock.history);
 	
-	return {content: '```Current price of $FLME: $'+stock.price+'```', files: [attachment] };
+    return {content: '```Current price of $FLME: $'+stock.price+'```', files: [attachment] };
 }
 
 async function updateMarketBoard(client) {
@@ -48,15 +30,12 @@ async function updateMarketBoard(client) {
 
     const targetValue = 100;
 
-    // Pulls the price back toward $100 every update
     const correction = (targetValue - stock.price) * 0.10;
 
-    // Small random movement so it does not look frozen
     const randomNoise = (Math.random() - 0.5) * 4;
 
     let targetPrice = stock.price + correction + randomNoise;
 
-    // Stable safety range
     if (targetPrice < 90) targetPrice = 90;
     if (targetPrice > 110) targetPrice = 110;
 
