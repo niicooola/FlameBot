@@ -32,12 +32,12 @@ async function updateMarketBoard(client) {
 
     const correction = (targetValue - stock.price) * 0.10;
 
-    const randomNoise = (Math.random() - 0.5) * 4;
+    const randomNoise = (Math.random() - 0.5) * 8;
 
     let targetPrice = stock.price + correction + randomNoise;
 
-    if (targetPrice < 90) targetPrice = 90;
-    if (targetPrice > 110) targetPrice = 110;
+    if (targetPrice < 80) targetPrice = 80;
+    if (targetPrice > 120) targetPrice = 120;
 
     stock.price = parseFloat(targetPrice.toFixed(2));
     stock.history.push(stock.price);
@@ -73,7 +73,31 @@ async function updateMarketBoard(client) {
 }
 
 function startMarketLoop(client) {
-    setTimeout(() => {
+    for (let i = 0; i < 15; ++i) {
+		const stock = marketTickersState['$FLME'];
+
+		stock.minuteOpen = stock.price;
+
+		const targetValue = 100;
+
+		const correction = (targetValue - stock.price) * 0.10;
+
+		const randomNoise = (Math.random() - 0.5) * 8;
+
+		let targetPrice = stock.price + correction + randomNoise;
+
+		if (targetPrice < 80) targetPrice = 80;
+		if (targetPrice > 120) targetPrice = 120;
+
+		stock.price = parseFloat(targetPrice.toFixed(2));
+		stock.history.push(stock.price);
+
+		if (stock.history.length > 25) {
+			stock.history.shift();
+		}
+	}
+	
+	setTimeout(() => {
         updateMarketBoard(client);
     }, 5000);
 
@@ -109,10 +133,12 @@ async function handleMarket(message, args, command, userData) {
 
     if (command === '!buyshares') {
         const ticker = args[1]?.toUpperCase();
-        const amount = cleanAmount(args[2]);
-
+        let amount = cleanAmount(args[2]);
+		if (['max', 'all'].includes(args[2]?.toLowerCase()?.trim()) && VALID_TICKERS.includes(ticker)) 
+			amount = Math.floor(userData.coins/marketTickersState[ticker].price);
+		
         if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
-            await message.reply('❌ Usage: `!buyshares $FLME <amount>`');
+            await message.reply('❌ Usage: `!buyshares $FLME <amount/max/all>`');
             return true;
         }
 
@@ -142,10 +168,12 @@ async function handleMarket(message, args, command, userData) {
 
     if (command === '!sellshares') {
         const ticker = args[1]?.toUpperCase();
-        const amount = cleanAmount(args[2]);
+        let amount = cleanAmount(args[2]);
+		if (['max', 'all'].includes(args[2]?.toLowerCase()?.trim()) && VALID_TICKERS.includes(ticker)) 
+			amount = userData.portfolios.get(ticker.replace('$',''));
 
         if (!VALID_TICKERS.includes(ticker) || !amount || amount <= 0) {
-            await message.reply('❌ Usage: `!sellshares $FLME <amount>`');
+            await message.reply('❌ Usage: `!sellshares $FLME <amount/max/all>`');
             return true;
         }
 

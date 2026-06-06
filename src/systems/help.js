@@ -7,7 +7,7 @@ async function handleHelp(message, args, command) {
 
     const pages = {
         economy: '`!bal`, `!daily`, `!work`, `!pay`, `!leaderboard`',
-        casino: '`!coinflip`, `!blackjack`, `!gamble slots`, `!roulette` (or `!rr`)',
+        casino: '`!coinflip`, `!blackjack`, `!gamble slots`, `!roulette` (or `!rr`), `!plinko`',
         market: '`!market`, `!stock`, `!portfolio`, `!buyshares`, `!sellshares`',
         fun: '`!8ball`, `!rps`, `!roll`, `!choose`, `!coin`, `!dice`, `!poll`, `!bananabread`',
         info: '`!stats`, `!rank`, `!serverinfo`, `!whois`, `!avatar`, `!ping`, `!uptime`, `!botinfo`, `!membercount`, `!channelinfo`, `!links`',
