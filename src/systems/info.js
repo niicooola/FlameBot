@@ -161,7 +161,7 @@ async function handleInfo(message, args, command, userData) {
     if (command === '!links') {
         return message.channel.send(
             '🔥 **Community Links**\n' +
-            'YouTube: https://www.youtube.com/@redflamingarrowlive\n' +
+            'YouTube: https://www.youtube.com/@redflamingarrowliven' +
             'Twitch: https://twitch.tv/redflamingarrow_'
         );
     }
