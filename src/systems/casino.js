@@ -301,7 +301,7 @@ async function handleCasino(message, args, command, userData) {
     if (command === '!slots') return runSlotsGame(message, args, userData);
     if (command === '!coinflip' || command === '!cf') return runCoinflipGame(message, args, userData);
     if (command === '!blackjack' || command === '!bj') return runBlackjackGame(message, args, userData);
-    if (command === '!roulette' || command === '!rr') return runRouletteGame(message, args, userData);
+    //if (command === '!roulette' || command === '!rr') return runRouletteGame(message, args, userData);
 
     if (command === '!gamble') {
         const mode = args[1]?.toLowerCase();
