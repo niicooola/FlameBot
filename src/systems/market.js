@@ -2,6 +2,8 @@ const { EmbedBuilder } = require('discord.js');
 const { MARKET_BOARD_CHANNEL_ID } = require('../config');
 const { cleanAmount } = require('../utils/amounts');
 const { renderTrendGraph } = require('../utils/graphs');
+const { isMaintainer } = require('../utils/permissions');
+const { client } = require('../client');
 
 const VALID_TICKERS = ['$FLME'];
 
@@ -112,6 +114,12 @@ async function handleMarket(message, args, command, userData) {
         await message.channel.send(graph);
         return true;
     }
+	
+	if (command === '!tick') {
+		if (!isMaintainer(message.member)) await message.reply('Missing permissions');
+		else await updateMarketBoard(client);
+		return true;
+	}
 
     if (command === '!portfolio') {
         if (!userData.portfolios || typeof userData.portfolios.get !== 'function') {
