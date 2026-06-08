@@ -82,7 +82,7 @@ function startMarketLoop(client) {
 
 		const correction = (targetValue - stock.price) * 0.10;
 
-		const randomNoise = (Math.random() - 0.5) * 8;
+		const randomNoise = (Math.random() * 2 + 3) * (Math.random() < 0.5 ? -1 : 1);
 
 		let targetPrice = stock.price + correction + randomNoise;
 
