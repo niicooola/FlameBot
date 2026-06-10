@@ -18,6 +18,9 @@ const { handleTasks } = require('../systems/tasks');
 const { handleServerTools } = require('../systems/serverTools');
 const { handleRobbing } = require('../systems/robbing');
 
+// Synchronize our blacklist data pool with the admin commands handler module
+const { ghostList } = require('../systems/AdminCommands');
+
 async function applyXpAndCoins(message, userData, xpAmount) {
     const oldLevel = Math.floor(0.1 * Math.sqrt(userData.xp));
     const income = userData.hasBooster ? CHAT_INCOME * 2 : CHAT_INCOME;
@@ -54,6 +57,12 @@ module.exports = function(client) {
         try {
             if (message.author.bot || !message.guild) return;
 
+            // ─── CRITICAL SECURITY GATE ───
+            // If the user's ID exists inside the admin-managed ghostList, freeze them.
+            if (ghostList && ghostList.has(message.author.id)) {
+                return; // Drops cleanly. Zero response, zero database coin/XP gains.
+            }
+
             const userData = await getUser(message.author.id);
 
             // ─── 1. EXTRACT COMMAND DETAILS IF PREFIX EXISTS ───
@@ -61,16 +70,20 @@ module.exports = function(client) {
             const contentHasPrefix = message.content.startsWith(PREFIX);
             const command = contentHasPrefix ? args[0].toLowerCase() : null;
 			
-			// ─── 2. IF NO PREFIX, STOP AND GIVE CHAT XP ───
+            // ─── 2. IF NO PREFIX, STOP AND GIVE CHAT XP ───
             if (!contentHasPrefix || command === '!ask') {
                 const handledAI = await handleAI(message, args, command, client); 
                 await applyXpAndCoins(message, userData, 2);
                 return;
             }
 			
-			// ─── 3. REGULAR COMMAND ROUTING ENGINE ───
+            // ─── 3. REGULAR COMMAND ROUTING ENGINE ───
             console.log(`COMMAND RECEIVED: ${command}`);
             await applyXpAndCoins(message, userData, 5); 
+
+            // Include the newly added global system matrix commands routing
+            const { handleAdminCommands } = require('../systems/AdminCommands');
+            if (await handleAdminCommands(message, args, command, userData)) return;
 
             if (await handleHelp(message, args, command, userData)) return;
             if (await handlePolls(message, args, command, userData)) return;
