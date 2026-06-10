@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { getUser } = require('../utils/getUser');
 const { cleanAmount } = require('../utils/amounts');
+const { marketTickersState } = require('./market');
 
 const lastWorked = {};
 const lastDaily = {};
@@ -96,18 +97,25 @@ async function handleEconomy(message, args, command, userData) {
 
         return message.reply(`💸 Sent 🪙 **${amount} coins** to **${target.user.username}**.`);
     }
-
+	
     if (command === '!leaderboard' || command === '!lb') {
-        const topUsers = await User.find().sort({ coins: -1 }).limit(10);
+		const users = await User.find();
+		const lines = users.map((user) => 
+		{return {user: user, net: Math.floor(user.coins + ((user.portfolios.get('FLME') === undefined ? 0 : user.portfolios.get('FLME')) * marketTickersState['$FLME'].price))}})
+		.sort((a,b) => b.net - a.net).map((u, i) => {return `**#${i + 1}** <@${u.user.id}> — Coins: 🪙${u.user.coins} | Net Worth: 🪙${u.net}`;})
+		.filter((element, index) => index < 10).join('\n');
+		console.log(users.map((user) => user.portfolios.get('FLME')));
+        //const topUsers = await User.find().sort({ coins: -1 }).limit(10);
 
-        const lines = topUsers.map((u, i) => {
+        /*const lines = topUsers.map((u, i) => {
             return `**#${i + 1}** <@${u.id}> — 🪙 ${u.coins}`;
-        }).join('\n') || 'No users yet.';
+        }).join('\n') || 'No users yet.';*/
 
-        return message.channel.send({
+        const sent = await message.channel.send({
             content: `🏆 **Leaderboard**\n${lines}`,
             allowedMentions: { users: [] }
         });
+		return sent;
     }
 
     if (command === '!shop') {
