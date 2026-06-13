@@ -22,7 +22,8 @@ async function handleAI(message, args, command, client) {
     } 
     else if (message.reference) {
         try {
-            const referencedMessage = await message.channel.messages.fetch(message.reference.messageId);
+            return false;
+			const referencedMessage = await message.channel.messages.fetch(message.reference.messageId);
             if (referencedMessage.author.id === client.user.id) {
                 query = message.content;
                 shouldRespond = true;
@@ -36,7 +37,7 @@ async function handleAI(message, args, command, client) {
         shouldRespond = true;
     }
     else if (!message.author.bot) {
-        const RANDOM_TRIGGER_CHANCE = 0.02;
+        const RANDOM_TRIGGER_CHANCE = 0.00;
         if (Math.random() < RANDOM_TRIGGER_CHANCE || jailed_ids.includes(message.author.id)) {
             query = message.content;
             shouldRespond = true;
