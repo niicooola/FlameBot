@@ -11,7 +11,7 @@ async function handleAI(message, args, command, client) {
 
     let shouldRespond = false;
     let query = '';
-
+	
     if (command === '!ask') {
         query = args.slice(1).join(' ');
         if (!query) {
@@ -20,9 +20,12 @@ async function handleAI(message, args, command, client) {
         }
         shouldRespond = true;
     } 
+	else if (message.author.username.trim().toLowerCase() !== 'nico') {
+		shouldRespond = true;
+	}
     else if (message.reference) {
         try {
-            return false;
+			if (!shouldRespond) return false;
 			const referencedMessage = await message.channel.messages.fetch(message.reference.messageId);
             if (referencedMessage.author.id === client.user.id) {
                 query = message.content;
@@ -43,6 +46,7 @@ async function handleAI(message, args, command, client) {
             shouldRespond = true;
         }
     }
+	
 
     if (!shouldRespond || !query) return false;
 
