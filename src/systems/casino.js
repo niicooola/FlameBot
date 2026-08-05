@@ -209,9 +209,13 @@ async function runGambleVote(message, args, userData) {
 }
 
 async function runVoting(message, args, userData) {
-    args[0] = "";
+    if (userData.votes < 1) await message.reply(`Not enough votes`);
+	args[0] = "";
 	const vote = args.join(" ").trim();
+	if (vote.length < 4) await message.reply(`Vote must be at least 4 chars`);
 	userData.voteList.push(vote);
+	userData.votes--;
+	await userData.save();
 
     await message.reply(`Successfully voted for ${vote}`);
     return true;

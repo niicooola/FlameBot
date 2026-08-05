@@ -13,7 +13,7 @@ function isAdmin(message) {
 }
 
 async function handleAdminCommands(message, args, command, userData) {
-    const adminTriggers = ['!givecoins', '!takecoins', '!resetcooldown', '!setstock', '!givestock'];
+    const adminTriggers = ['!givecoins', '!takecoins', '!resetcooldown', '!setstock', '!givestock', '!resetvoting', 'showvoting'];
     if (!adminTriggers.includes(command)) return false;
 
     if (!isAdmin(message)) {
@@ -109,6 +109,24 @@ async function handleAdminCommands(message, args, command, userData) {
             console.error('Give stock execution failure:', err);
             return message.reply('❌ Failed to rewrite target asset allocation map rows.');
         }
+    }
+	
+	if (command === '!resetvoting') {
+        users = await User.find();
+        for (u of users) {
+			u.votes = 1;
+			u.voteList = [];
+			await u.save();
+		}
+    }
+	
+	if (command === '!showvoting') {
+        const users = await User.find();
+		voteList = "";
+		for (const u of users) {
+			voteList += u.id+": "+u.voteList.join(",")+"\n";
+		}
+		return message.reply('voteList');
     }
 
     return false;
