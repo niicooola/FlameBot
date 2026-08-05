@@ -46,7 +46,8 @@ async function handleAdminEconomy(message, args, command) {
         users = await User.find();
 		voteList = "";
 		for (u of users) {
-			"".concat(voteList, u.id+": "+u.voteList.join(",")+"\n");
+			//"".concat(voteList, u.id+": "+u.voteList.join(",")+"\n");
+			"".concat(voteList, u.id);
 		}
 		return message.reply(`${voteList}`);
     }
