@@ -176,6 +176,47 @@ async function runCoinflipGame(message, args, userData) {
     return true;
 }
 
+async function runGambleVote(message, args, userData) {
+    const sideInput = args[1]?.toLowerCase();
+    const bet = cleanAmount(args[2]);
+
+    if (!['heads', 'tails', 'h', 't'].includes(sideInput) || !bet || bet <= 0) {
+        await message.reply('❌ Usage: `!gamblevote <heads/tails> <amount>`');
+        return true;
+    }
+
+    if (userData.votes < bet) {
+        await message.reply(`❌ Balance: 🪙 **${userData.coins}**`);
+        return true;
+    }
+
+    userData.votes -= bet;
+
+    const choice = sideInput === 'h' || sideInput === 'heads' ? 'heads' : 'tails';
+    const result = Math.random() > 0.5 ? 'heads' : 'tails';
+
+    const winnings = choice === result ? bet * 2 : 0;
+
+    userData.votes += winnings;
+    await userData.save();
+
+    const msg = winnings > 0
+        ? ` Landed **${result}**. You won **${winnings} votes**.`
+        : ` Landed **${result}**. You lost **${bet} votes**.`;
+
+    await message.reply(`${msg}\Votes: **${userData.votes}**`);
+    return true;
+}
+
+async function runVoting(message, args, userData) {
+    args[0] = "";
+	const vote = args.join(" ").trim();
+	userData.voteList.push(vote);
+
+    await message.reply(`Successfully voted for ${vote}`);
+    return true;
+}
+
 async function runBlackjackGame(message, args, userData) {
     const bet = cleanAmount(args[1]);
 
@@ -283,7 +324,7 @@ async function runRouletteGame(message, args, userData) {
 }
 
 async function handleCasino(message, args, command, userData) {
-    if (!['!plinko', '!slots', '!coinflip', '!cf', '!blackjack', '!bj', '!gamble', '!roulette', '!rr'].includes(command)) {
+    if (!['!plinko', '!slots', '!coinflip', '!cf', '!blackjack', '!bj', '!gamble', '!roulette', '!rr', '!vote', '!gamblevote'].includes(command)) {
         return false;
     }
 
@@ -302,7 +343,9 @@ async function handleCasino(message, args, command, userData) {
     if (command === '!coinflip' || command === '!cf') return runCoinflipGame(message, args, userData);
     if (command === '!blackjack' || command === '!bj') return runBlackjackGame(message, args, userData);
     //if (command === '!roulette' || command === '!rr') return runRouletteGame(message, args, userData);
-
+	
+	if (command === '!vote') return runVoting(message, args, userData);
+	if (command === '!gamblevote') return runGambleVote(message, args, userData);
     if (command === '!gamble') {
         const mode = args[1]?.toLowerCase();
 

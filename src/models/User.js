@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema({
     customTitle: { type: String, default: null },
     hasShield: { type: Boolean, default: false },
     portfolios: { type: Map, of: Number, default: {} },
+	votes: {type: Number, default: 1 },
+    voteList: {type: [String], default: [] },
 
     bio: { type: String, default: null },
     inventory: { type: [String], default: [] },
