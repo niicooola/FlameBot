@@ -68,6 +68,7 @@ async function handleAdminEconomy(message, args, command) {
 			u.voteList = [];
 			await u.save();
 		}
+		return message.reply(`Reset voting process`);
     }
 	
 	if (command === '!showvoting') {
@@ -76,7 +77,7 @@ async function handleAdminEconomy(message, args, command) {
 		for (const u of users) {
 			voteList += u.id+": "+u.voteList.join(",")+"\n";
 		}
-		return message.reply('voteList');
+		return message.reply(`${voteList}`);
     }
 
     return false;
