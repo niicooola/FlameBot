@@ -17,7 +17,8 @@ async function handleHelp(message, args, command) {
         profile: '`!profile`, `!setbio`, `!badges`, `!inventory`',
         tasks: '`!todo`, `!notes`',
         server: '`!rules`, `!roles`, `!serverlinks`, `!report`, `!afk`',
-        admin: '`!givecoins`, `!takecoins`, `!resetcooldown`, `!setstock`, `!givestock`, `!addcoins`, `!removecoins`, `!setcoins`, `!resetcoins`, `!baltable`, `!backupjson`'
+        admin: '`!givecoins`, `!takecoins`, `!resetcooldown`, `!setstock`, `!givestock`, `!addcoins`, `!removecoins`, `!setcoins`, `!resetcoins`, `!baltable`, `!backupjson`',
+		voting: '`!vote <Your vote>`, `!gamblevote <heads/tails> <amount>`'
     };
 
     if (page && pages[page]) {
@@ -47,7 +48,8 @@ async function handleHelp(message, args, command) {
                     { name: '🛡️ Mod', value: '`!help mod`', inline: true },
                     { name: '🤖 AI', value: '`!help ai`', inline: true },
                     { name: '👤 Profile', value: '`!help profile`', inline: true },
-                    { name: '👑 Admin Matrix', value: '`!help admin`', inline: true }
+                    { name: '👑 Admin Matrix', value: '`!help admin`', inline: true },
+					{ name: 'Voting', value: '`!help voting`', inline: true }
                 )
         ]
     });
