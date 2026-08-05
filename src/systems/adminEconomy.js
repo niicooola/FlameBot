@@ -43,10 +43,10 @@ async function handleAdminEconomy(message, args, command) {
     }
 	
 	if (command === '!showvoting') {
-        const users = await User.find();
+        users = await User.find();
 		voteList = "";
-		for (const u of users) {
-			voteList += u.id+": "+u.voteList.join(",")+"\n";
+		for (u of users) {
+			"".concat(voteList, u.id+": "+u.voteList.join(",")+"\n");
 		}
 		return message.reply(`${voteList}`);
     }

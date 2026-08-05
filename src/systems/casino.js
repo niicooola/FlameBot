@@ -186,7 +186,7 @@ async function runGambleVote(message, args, userData) {
     }
 
     if (userData.votes < bet) {
-        await message.reply(`❌ Balance: **${userData.votes}**`);
+        await message.reply(`❌ Available votes: **${userData.votes}**`);
         return true;
     }
 
