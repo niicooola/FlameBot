@@ -1,13 +1,13 @@
 const User = require('../models/User');
 const { cleanAmount } = require('../utils/amounts');
-const { isAdmin } = require('../utils/permissions');
+const { isMaintainer } = require('../utils/permissions');
 
 async function handleAdminEconomy(message, args, command) {
-    if (!['!addcoins', '!givecoins', '!removecoins', '!deductcoins', '!setcoins', '!resetcoins', '!baltable', '!balancetable', '!backupjson'].includes(command)) {
+    if (!['!addcoins', '!givecoins', '!removecoins', '!deductcoins', '!setcoins', '!resetcoins', '!baltable', '!balancetable', '!backupjson', '!resetvoting', '!showvoting'].includes(command)) {
         return false;
     }
 
-    if (!isAdmin(message.member)) return message.reply('❌ Admins only.');
+    if (!isMaintainer(message.member)) return message.reply('❌ Admins only.');
 
     if (command === '!baltable' || command === '!balancetable') {
         const users = await User.find().sort({ coins: -1 }).limit(30);
@@ -59,6 +59,24 @@ async function handleAdminEconomy(message, args, command) {
     if (command === '!setcoins') {
         await User.updateOne({ id: target.id }, { $set: { coins: amount } }, { upsert: true });
         return message.reply(`🔧 Set ${target.user.username}'s coins to 🪙 **${amount}**.`);
+    }
+	
+	if (command === '!resetvoting') {
+        users = await User.find();
+        for (u of users) {
+			u.votes = 1;
+			u.voteList = [];
+			await u.save();
+		}
+    }
+	
+	if (command === '!showvoting') {
+        const users = await User.find();
+		voteList = "";
+		for (const u of users) {
+			voteList += u.id+": "+u.voteList.join(",")+"\n";
+		}
+		return message.reply('voteList');
     }
 
     return false;
