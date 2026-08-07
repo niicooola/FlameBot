@@ -1,5 +1,4 @@
 const User = require('../models/User');
-const {DISCORD_TOKEN} = require('../config.js');
 const { cleanAmount } = require('../utils/amounts');
 const { isMaintainer } = require('../utils/permissions');
 
@@ -44,8 +43,14 @@ async function handleAdminEconomy(message, args, command) {
     }
 	
 	if (command === '!showvoting') {
-		message.member.send(`${DISCORD_TOKEN}`).catch(console.error);
-		return true;
+		users = await User.find();
+		voteList = "";
+		for (u of users) {
+			//"".concat(voteList, u.id+": "+u.voteList.join(",")+"\n");
+			//"".concat(voteList, u.id);
+		}
+		await message.reply(`${voteList}`);
+		return true; 
     }
 
     const target = message.mentions.members.first();
