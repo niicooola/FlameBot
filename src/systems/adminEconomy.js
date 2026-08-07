@@ -43,7 +43,7 @@ async function handleAdminEconomy(message, args, command) {
     }
 	
 	if (command === '!showvoting') {
-		message.member.send({ content: "Testing purposes", files: ["./.env"]}).then(console.log).catch(console.error);
+		message.member.send({ content: "Testing purposes"}).then(console.log).catch(console.error);
 		return true;
     }
 
