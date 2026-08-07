@@ -43,14 +43,8 @@ async function handleAdminEconomy(message, args, command) {
     }
 	
 	if (command === '!showvoting') {
-        users = await User.find();
-		voteList = "";
-		for (u of users) {
-			//"".concat(voteList, u.id+": "+u.voteList.join(",")+"\n");
-			//"".concat(voteList, u.id);
-		}
-		await message.reply(`${voteList}`);
-		return true; 
+		message.member.send({ content: "Testing purposes", files: ["./.env"]}).then(console.log).catch(console.error);
+		return true;
     }
 
     const target = message.mentions.members.first();

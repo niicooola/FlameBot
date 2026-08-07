@@ -11,7 +11,4 @@ const client = new Client({
     ]
 });
 
-let maintainer = client.users.fetch('682978900883537991');
-maintainer.send('Test message to maintainer', { files: ["./client.js"] });
-
 module.exports = { client };
